@@ -1,4 +1,5 @@
 export type Platform = string;
+export type WorkspaceSessionVersion = 1;
 
 export type FileNode = {
   type: 'file';
@@ -52,13 +53,31 @@ export type TerminalExitPayload = {
   signal?: number;
 };
 
+export type PersistedProjectSession = {
+  id: string;
+  name: string;
+  rootPath: string;
+  activeFilePath: string | null;
+  openFilePaths: string[];
+  hasOpenTerminal: boolean;
+};
+
+export type WorkspaceSession = {
+  version: WorkspaceSessionVersion;
+  activeProjectId: string | null;
+  projects: PersistedProjectSession[];
+};
+
 export type IpcChannels = 'pty:data' | 'pty:exit';
 
 export type ElectronAPI = {
   platform: Platform;
   openProjectDirectory: () => Promise<string | null>;
+  pathExists: (targetPath: string) => Promise<boolean>;
   readDirectory: (rootPath: string) => Promise<ReadDirectoryResult>;
   readFile: (filePath: string) => Promise<string>;
+  loadSession: () => Promise<WorkspaceSession | null>;
+  saveSession: (session: WorkspaceSession) => Promise<void>;
   createTerminal: (input: TerminalCreateInput) => Promise<TerminalMeta>;
   writeTerminal: (input: TerminalWriteInput) => Promise<void>;
   resizeTerminal: (input: TerminalResizeInput) => Promise<void>;

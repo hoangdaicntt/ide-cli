@@ -15,7 +15,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function Workspace({ project }: WorkspaceProps) {
-  const [leftWidth, setLeftWidth] = useState(280);
+  const [leftWidth, setLeftWidth] = useState(300);
   const [rightWidth, setRightWidth] = useState(420);
   const [resizing, setResizing] = useState<ResizeTarget>(null);
 
@@ -50,7 +50,7 @@ export function Workspace({ project }: WorkspaceProps) {
     <section className="h-full">
       <div className="flex h-full min-h-0 overflow-hidden">
         <aside
-          className="min-h-0 border-r border-white/6 bg-white/[0.025]"
+          className="min-h-0 border-r border-[#d4dae3] bg-[#f5f7fa]"
           style={{ width: leftWidth }}
         >
           <FileTree
@@ -64,10 +64,10 @@ export function Workspace({ project }: WorkspaceProps) {
           type="button"
           aria-label="Resize file explorer"
           onMouseDown={() => setResizing('left')}
-          className="w-1.5 cursor-col-resize bg-transparent transition hover:bg-sky-400/40"
+          className="w-1 cursor-col-resize bg-[#d4dae3] transition hover:bg-[#9eb7d4]"
         />
 
-        <main className="min-w-0 flex-1">
+        <main className="min-w-0 flex-1 bg-white">
           <Editor projectId={project.id} />
         </main>
 
@@ -75,11 +75,11 @@ export function Workspace({ project }: WorkspaceProps) {
           type="button"
           aria-label="Resize terminal panel"
           onMouseDown={() => setResizing('right')}
-          className="w-1.5 cursor-col-resize bg-transparent transition hover:bg-sky-400/40"
+          className="w-1 cursor-col-resize bg-[#d4dae3] transition hover:bg-[#9eb7d4]"
         />
 
         <aside
-          className="min-h-0 border-l border-white/6 bg-white/[0.025]"
+          className="min-h-0 border-l border-[#d4dae3] bg-[#fbfcfe]"
           style={{ width: rightWidth }}
         >
           <Terminal projectId={project.id} />

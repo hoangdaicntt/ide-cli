@@ -3,6 +3,7 @@ import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import { useWorkspaceStore } from '../store/store';
+import { TerminalAssetIcon } from './FileTreeAssetIcons';
 
 type TerminalProps = {
   projectId: string;
@@ -47,10 +48,20 @@ export function Terminal({ projectId }: TerminalProps) {
       letterSpacing: 0.4,
       lineHeight: 1.25,
       theme: {
-        background: '#0c1117',
-        foreground: '#d4dde9',
-        cursor: '#8bd3ff',
-        selectionBackground: '#294968',
+        background: '#ffffff',
+        foreground: '#1f2329',
+        cursor: '#1f78d1',
+        selectionBackground: '#cfe8ff',
+        black: '#1f2329',
+        brightBlack: '#5f6b7a',
+        blue: '#1f78d1',
+        brightBlue: '#4d9df7',
+        green: '#2f8f5b',
+        brightGreen: '#4caf74',
+        red: '#c75450',
+        brightRed: '#e06764',
+        yellow: '#b57d19',
+        brightYellow: '#d19a2a',
       },
     });
     const fitAddon = new FitAddon();
@@ -140,19 +151,24 @@ export function Terminal({ projectId }: TerminalProps) {
   }, [ensureTerminal, projectId, rootPath, terminalMeta?.terminalId]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[#0c1117]">
-      <div className="flex h-12 items-center justify-between border-b border-white/6 bg-white/[0.02] px-4">
-        <div>
-          <div className="text-sm font-medium text-white/92">Terminal</div>
-          <div className="text-xs text-white/35">{rootPath}</div>
+    <div className="flex h-full flex-col overflow-hidden bg-[#fbfcfe]">
+      <div className="flex h-9 items-center justify-between border-b border-[#d4dae3] bg-[#f7f9fc] px-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <TerminalAssetIcon />
+          <div>
+            <div className="text-[12px] font-medium text-[#1f2329]">Terminal</div>
+          </div>
         </div>
-        <div className="rounded-full border border-emerald-400/15 bg-emerald-400/8 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200/85">
-          {terminalStatus}
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="text-[11px] text-[#7b8594]">{rootPath}</div>
+          <div className="border border-[#d2d8e1] bg-white px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[#556070]">
+            {terminalStatus}
+          </div>
         </div>
       </div>
       <div
         ref={hostRef}
-        className="relative flex-1 min-h-0 px-3 py-3"
+        className="relative flex-1 min-h-0 bg-white px-2 py-2"
         onMouseDown={() => {
           requestAnimationFrame(() => {
             focusTerminal();

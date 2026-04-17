@@ -1,18 +1,19 @@
 import { useEffect } from 'react';
+import { TerminalAssetIcon } from './components/FileTreeAssetIcons';
 import { HeaderTabs } from './components/HeaderTabs';
 import { Workspace } from './components/Workspace';
-import { useWorkspaceStore } from './store/store';
+import { initializeWorkspacePersistence, useWorkspaceStore } from './store/store';
 
 function EmptyState() {
   return (
-    <div className="flex h-full items-center justify-center px-8">
+    <div className="flex h-full items-center justify-center bg-[#f5f7fa] px-8">
       <div className="max-w-2xl text-center">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.06] shadow-panel">
-          <span className="text-2xl text-white/90">⌘</span>
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center border border-[#cfd6e0] bg-white">
+          <TerminalAssetIcon className="h-6 w-6" />
         </div>
-        <h1 className="text-3xl font-semibold tracking-[-0.03em] text-white/96">Multi-project workspace, native terminal, zero noise.</h1>
-        <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-white/46">
-          Open a folder to create an isolated project workspace with its own file tree, editor state, and PTY-backed shell.
+        <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#1f2329]">Open a project to start working.</h1>
+        <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#687384]">
+          The workspace is organized like a JetBrains IDE with a project tree on the left, the editor in the center, and a terminal tool window on the right.
         </p>
       </div>
     </div>
@@ -24,8 +25,15 @@ export default function App() {
   const projects = useWorkspaceStore((state) => state.projects);
   const activeProjectId = useWorkspaceStore((state) => state.activeProjectId);
   const handleTerminalExit = useWorkspaceStore((state) => state.handleTerminalExit);
+  const hasHydratedWorkspace = useWorkspaceStore((state) => state.hasHydratedWorkspace);
+  const hydrateWorkspace = useWorkspaceStore((state) => state.hydrateWorkspace);
 
   const activeProject = activeProjectId ? projects[activeProjectId] ?? null : null;
+
+  useEffect(() => {
+    initializeWorkspacePersistence();
+    void hydrateWorkspace();
+  }, [hydrateWorkspace]);
 
   useEffect(() => {
     const dispose = window.electronAPI.onTerminalExit((payload) => {
@@ -37,13 +45,23 @@ export default function App() {
     };
   }, [handleTerminalExit]);
 
+  if (!hasHydratedWorkspace) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#f5f7fa] text-[#5f6b7a]">
+        <div className="flex items-center gap-3 border border-[#cfd6e0] bg-white px-4 py-3 text-sm">
+          <TerminalAssetIcon />
+          <span>Restoring workspace...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-screen overflow-hidden bg-[#0b0f14] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.09),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_16%)]" />
-      <div className="relative flex h-full flex-col">
+    <div className="h-screen overflow-hidden bg-[#dfe3ea] text-[#1f2329]">
+      <div className="flex h-full flex-col">
         <HeaderTabs />
-        <div className="min-h-0 flex-1 p-4 pt-3">
-          <div className="h-full overflow-hidden rounded-[28px] border border-white/8 bg-[#0d1218]/92 shadow-panel backdrop-blur-xl">
+        <div className="min-h-0 flex-1">
+          <div className="h-full overflow-hidden border-t border-[#f7f9fc]">
             {projectIds.length === 0 ? (
               <EmptyState />
             ) : activeProject ? (

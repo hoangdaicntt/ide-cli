@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import type { DirectoryNode, FileNode, TerminalExitPayload, TerminalMeta } from '../shared/ipc';
+import type {
+  DirectoryNode,
+  FileNode,
+  PersistedProjectSession,
+  TerminalExitPayload,
+  TerminalMeta,
+  WorkspaceSession,
+} from '../shared/ipc';
 
 type EditorTab = {
   path: string;
@@ -24,18 +31,24 @@ type WorkspaceStore = {
   projects: Record<string, ProjectWorkspace>;
   activeProjectId: string | null;
   isOpeningProject: boolean;
+  hasHydratedWorkspace: boolean;
   openProject: () => Promise<void>;
+  closeProject: (projectId: string) => Promise<void>;
   setActiveProject: (projectId: string) => void;
   openFile: (projectId: string, file: FileNode) => Promise<void>;
   updateFileContent: (projectId: string, filePath: string, content: string) => void;
   ensureTerminal: (projectId: string) => Promise<TerminalMeta | null>;
   handleTerminalExit: (payload: TerminalExitPayload) => void;
+  hydrateWorkspace: () => Promise<void>;
 };
 
 const terminalRequests = new Map<string, Promise<TerminalMeta>>();
+let workspaceHydrationPromise: Promise<void> | null = null;
+let workspacePersistenceInitialized = false;
 
 function getNameFromPath(filePath: string): string {
-  const segments = filePath.split('/');
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const segments = normalizedPath.split('/');
   return segments[segments.length - 1] ?? filePath;
 }
 
@@ -44,8 +57,101 @@ function getProjectId(rootPath: string): string {
 }
 
 function getProjectName(rootPath: string): string {
-  const segments = rootPath.split('/').filter(Boolean);
+  const normalizedPath = rootPath.replace(/\\/g, '/');
+  const segments = normalizedPath.split('/').filter(Boolean);
   return segments[segments.length - 1] ?? rootPath;
+}
+
+function createProjectWorkspace(input: {
+  id: string;
+  name: string;
+  rootPath: string;
+  tree: DirectoryNode[];
+  openFiles?: Record<string, EditorTab>;
+  activeFilePath?: string | null;
+  terminalStatus?: ProjectWorkspace['terminalStatus'];
+}): ProjectWorkspace {
+  return {
+    id: input.id,
+    name: input.name,
+    rootPath: input.rootPath,
+    tree: input.tree,
+    openFiles: input.openFiles ?? {},
+    activeFilePath: input.activeFilePath ?? null,
+    terminal: null,
+    terminalStatus: input.terminalStatus ?? 'idle',
+  };
+}
+
+function buildPersistedProjectSession(project: ProjectWorkspace): PersistedProjectSession {
+  return {
+    id: project.id,
+    name: project.name,
+    rootPath: project.rootPath,
+    activeFilePath: project.activeFilePath,
+    openFilePaths: Object.keys(project.openFiles),
+    hasOpenTerminal: Boolean(project.terminal) || project.terminalStatus === 'running',
+  };
+}
+
+function buildWorkspaceSession(state: Pick<WorkspaceStore, 'projectIds' | 'projects' | 'activeProjectId'>): WorkspaceSession {
+  return {
+    version: 1,
+    activeProjectId: state.activeProjectId,
+    projects: state.projectIds
+      .map((projectId) => state.projects[projectId])
+      .filter((project): project is ProjectWorkspace => Boolean(project))
+      .map((project) => buildPersistedProjectSession(project)),
+  };
+}
+
+async function restoreProjectSession(projectSession: PersistedProjectSession): Promise<ProjectWorkspace | null> {
+  const rootPathExists = await window.electronAPI.pathExists(projectSession.rootPath);
+
+  if (!rootPathExists) {
+    console.warn(`[workspace:hydrate] Skipping missing project root: ${projectSession.rootPath}`);
+    return null;
+  }
+
+  const tree = await window.electronAPI.readDirectory(projectSession.rootPath);
+  const openFilesEntries: Record<string, EditorTab> = {};
+
+  for (const filePath of projectSession.openFilePaths) {
+    const fileExists = await window.electronAPI.pathExists(filePath);
+
+    if (!fileExists) {
+      console.warn(`[workspace:hydrate] Skipping missing file: ${filePath}`);
+      continue;
+    }
+
+    try {
+      const content = await window.electronAPI.readFile(filePath);
+
+      openFilesEntries[filePath] = {
+        path: filePath,
+        name: getNameFromPath(filePath),
+        content,
+        isDirty: false,
+      };
+    } catch (error) {
+      console.warn(`[workspace:hydrate] Failed to restore file: ${filePath}`, error);
+    }
+  }
+
+  const activeFilePath =
+    projectSession.activeFilePath && openFilesEntries[projectSession.activeFilePath]
+      ? projectSession.activeFilePath
+      : Object.keys(openFilesEntries)[0] ?? null;
+
+  return createProjectWorkspace({
+    id: projectSession.id,
+    name: projectSession.name || getProjectName(projectSession.rootPath),
+    rootPath: projectSession.rootPath,
+    tree,
+    openFiles: openFilesEntries,
+    activeFilePath,
+    terminalStatus: projectSession.hasOpenTerminal ? 'idle' : 'idle',
+  });
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -53,6 +159,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   projects: {},
   activeProjectId: null,
   isOpeningProject: false,
+  hasHydratedWorkspace: false,
 
   openProject: async () => {
     if (get().isOpeningProject) {
@@ -83,16 +190,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         activeProjectId: projectId,
         projects: {
           ...state.projects,
-          [projectId]: {
+          [projectId]: createProjectWorkspace({
             id: projectId,
             name: getProjectName(selectedPath),
             rootPath: selectedPath,
             tree,
-            openFiles: {},
-            activeFilePath: null,
-            terminal: null,
-            terminalStatus: 'idle',
-          },
+          }),
         },
       }));
     } finally {
@@ -102,6 +205,31 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   setActiveProject: (projectId: string) => {
     set({ activeProjectId: projectId });
+  },
+
+  closeProject: async (projectId: string) => {
+    const project = get().projects[projectId];
+
+    terminalRequests.delete(projectId);
+
+    if (project?.terminal?.terminalId) {
+      await window.electronAPI.killTerminal(project.terminal.terminalId);
+    }
+
+    set((state) => {
+      const nextProjects = { ...state.projects };
+      delete nextProjects[projectId];
+
+      const nextProjectIds = state.projectIds.filter((id) => id !== projectId);
+      const nextActiveProjectId =
+        state.activeProjectId === projectId ? nextProjectIds[nextProjectIds.length - 1] ?? null : state.activeProjectId;
+
+      return {
+        projectIds: nextProjectIds,
+        projects: nextProjects,
+        activeProjectId: nextActiveProjectId,
+      };
+    });
   },
 
   openFile: async (projectId: string, file: FileNode) => {
@@ -248,7 +376,103 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       };
     });
   },
+
+  hydrateWorkspace: async () => {
+    if (get().hasHydratedWorkspace) {
+      return;
+    }
+
+    if (workspaceHydrationPromise) {
+      return workspaceHydrationPromise;
+    }
+
+    workspaceHydrationPromise = (async () => {
+      const session = await window.electronAPI.loadSession();
+
+      if (!session || session.projects.length === 0) {
+        set({ hasHydratedWorkspace: true });
+        return;
+      }
+
+      const restoredProjectEntries = await Promise.all(
+        session.projects.map(async (projectSession) => {
+          const restoredProject = await restoreProjectSession(projectSession);
+          return restoredProject ? ([projectSession.id, restoredProject] as const) : null;
+        }),
+      );
+
+      const validProjectEntries = restoredProjectEntries.filter(
+        (entry): entry is readonly [string, ProjectWorkspace] => Boolean(entry),
+      );
+      const projects = Object.fromEntries(validProjectEntries);
+      const projectIds = validProjectEntries.map(([projectId]) => projectId);
+      const activeProjectId =
+        session.activeProjectId && projects[session.activeProjectId]
+          ? session.activeProjectId
+          : projectIds[0] ?? null;
+
+      set({
+        projects,
+        projectIds,
+        activeProjectId,
+      });
+
+      await Promise.all(
+        session.projects
+          .filter((projectSession) => projectSession.hasOpenTerminal && projects[projectSession.id])
+          .map(async (projectSession) => {
+            await get().ensureTerminal(projectSession.id);
+          }),
+      );
+
+      set({ hasHydratedWorkspace: true });
+    })()
+      .catch((error) => {
+        console.error('[workspace:hydrate] Failed to restore session.', error);
+        set({ hasHydratedWorkspace: true });
+      })
+      .finally(() => {
+        workspaceHydrationPromise = null;
+      });
+
+    return workspaceHydrationPromise;
+  },
 }));
+
+export function initializeWorkspacePersistence(): void {
+  if (workspacePersistenceInitialized) {
+    return;
+  }
+
+  workspacePersistenceInitialized = true;
+  let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+  let lastSerializedSession = '';
+
+  useWorkspaceStore.subscribe((state) => {
+    if (!state.hasHydratedWorkspace) {
+      return;
+    }
+
+    const session = buildWorkspaceSession(state);
+    const serializedSession = JSON.stringify(session);
+
+    if (serializedSession === lastSerializedSession) {
+      return;
+    }
+
+    lastSerializedSession = serializedSession;
+
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+    }
+
+    saveTimeout = setTimeout(() => {
+      void window.electronAPI.saveSession(session).catch((error) => {
+        console.error('[workspace:save] Failed to persist workspace session.', error);
+      });
+    }, 250);
+  });
+}
 
 export function getActiveProject(state: WorkspaceStore): ProjectWorkspace | null {
   return state.activeProjectId ? state.projects[state.activeProjectId] ?? null : null;

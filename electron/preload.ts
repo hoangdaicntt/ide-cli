@@ -8,13 +8,17 @@ import type {
   TerminalOutputPayload,
   TerminalResizeInput,
   TerminalWriteInput,
+  WorkspaceSession,
 } from '../src/shared/ipc.js';
 
 const electronAPI: ElectronAPI = {
   platform: process.platform,
   openProjectDirectory: () => ipcRenderer.invoke('dialog:open-project'),
+  pathExists: (targetPath: string): Promise<boolean> => ipcRenderer.invoke('fs:path-exists', targetPath),
   readDirectory: (rootPath: string): Promise<DirectoryNode[]> => ipcRenderer.invoke('fs:read-directory', rootPath),
   readFile: (filePath: string) => ipcRenderer.invoke('fs:read-file', filePath),
+  loadSession: (): Promise<WorkspaceSession | null> => ipcRenderer.invoke('session:load'),
+  saveSession: (session: WorkspaceSession) => ipcRenderer.invoke('session:save', session),
   createTerminal: (input: TerminalCreateInput): Promise<TerminalMeta> => ipcRenderer.invoke('pty:create', input),
   writeTerminal: (input: TerminalWriteInput) => ipcRenderer.invoke('pty:write', input),
   resizeTerminal: (input: TerminalResizeInput) => ipcRenderer.invoke('pty:resize', input),

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { DirectoryNode, FileNode } from '../shared/ipc';
 import { useWorkspaceStore } from '../store/store';
+import { ArrowExpandIcon, TreeAssetIcon } from './FileTreeAssetIcons';
 
 type FileTreeProps = {
   projectId: string;
@@ -38,11 +39,12 @@ function TreeNode({
           void openFile(projectId, node);
         }}
         className={[
-          'flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] transition',
-          isActive ? 'bg-sky-500/16 text-sky-100' : 'text-white/60 hover:bg-white/[0.04] hover:text-white/95',
+          'flex w-full items-center gap-2 px-2 py-1.5 text-left text-[13px] leading-5 transition',
+          isActive ? 'bg-[#dbeafe] text-[#12447f]' : 'text-[#3b4350] hover:bg-[#edf2f8] hover:text-[#1f2329]',
         ].join(' ')}
-        style={{ paddingLeft: 12 + depth * 14 }}
+        style={{ paddingLeft: 10 + depth * 16 }}
       >
+        <TreeAssetIcon fileName={node.name} />
         <span className="truncate">{node.name}</span>
       </button>
     );
@@ -53,10 +55,11 @@ function TreeNode({
       <button
         type="button"
         onClick={() => onToggle(node.path)}
-        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] text-white/78 transition hover:bg-white/[0.04] hover:text-white"
-        style={{ paddingLeft: 12 + depth * 14 }}
+        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[13px] font-medium text-[#38404d] transition hover:bg-[#edf2f8] hover:text-[#1f2329]"
+        style={{ paddingLeft: 10 + depth * 16 }}
       >
-        <span className="text-[11px] text-white/40">{isExpanded ? '▾' : '▸'}</span>
+        <ArrowExpandIcon expanded={isExpanded} className="h-3 w-3 shrink-0 opacity-70" />
+        <TreeAssetIcon isFolder />
         <span className="truncate font-medium">{node.name}</span>
       </button>
 
@@ -98,8 +101,10 @@ export function FileTree({ projectId, nodes, activeFilePath }: FileTreeProps) {
   };
 
   return (
-    <div className="h-full overflow-auto px-3 py-4">
-      <div className="mb-4 px-3 text-[11px] font-medium uppercase tracking-[0.24em] text-white/28">Explorer</div>
+    <div className="h-full overflow-auto bg-[#f5f7fa] px-2 py-2">
+      <div className="mb-2 border-b border-[#d8dde6] px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6c7686]">
+        Project
+      </div>
       <div className="space-y-1">
         {nodes.map((node) => (
           <TreeNode

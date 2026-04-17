@@ -9,6 +9,7 @@ import type {
   DirectoryNode,
   FileNode,
   IpcChannels,
+  PersistedProjectSession,
   ReadDirectoryResult,
   TerminalCreateInput,
   TerminalExitPayload,
@@ -16,6 +17,7 @@ import type {
   TerminalOutputPayload,
   TerminalResizeInput,
   TerminalWriteInput,
+  WorkspaceSession,
 } from '../src/shared/ipc.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +31,7 @@ const IGNORED_NAMES = new Set([
   'dist-electron',
   'node_modules',
 ]);
+const SESSION_FILE_NAME = 'workspace-session.json';
 
 type TerminalSession = {
   meta: TerminalMeta;
@@ -124,6 +127,43 @@ function resolveShell(preferredShell?: string): string {
   return '/bin/zsh';
 }
 
+function getSessionFilePath(): string {
+  return path.join(app.getPath('userData'), SESSION_FILE_NAME);
+}
+
+function isPersistedProjectSession(value: unknown): value is PersistedProjectSession {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as PersistedProjectSession;
+
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
+    typeof candidate.rootPath === 'string' &&
+    (typeof candidate.activeFilePath === 'string' || candidate.activeFilePath === null) &&
+    Array.isArray(candidate.openFilePaths) &&
+    candidate.openFilePaths.every((entry) => typeof entry === 'string') &&
+    typeof candidate.hasOpenTerminal === 'boolean'
+  );
+}
+
+function isWorkspaceSession(value: unknown): value is WorkspaceSession {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as WorkspaceSession;
+
+  return (
+    candidate.version === 1 &&
+    (typeof candidate.activeProjectId === 'string' || candidate.activeProjectId === null) &&
+    Array.isArray(candidate.projects) &&
+    candidate.projects.every((project) => isPersistedProjectSession(project))
+  );
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1560,
@@ -200,6 +240,54 @@ ipcMain.handle('fs:read-directory', async (_, rootPath: string) => {
 
 ipcMain.handle('fs:read-file', async (_, filePath: string) => {
   return fs.readFile(filePath, 'utf8');
+});
+
+ipcMain.handle('fs:path-exists', async (_, targetPath: string) => {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle('session:load', async () => {
+  const sessionFilePath = getSessionFilePath();
+
+  try {
+    const raw = await fs.readFile(sessionFilePath, 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (!isWorkspaceSession(parsed)) {
+      console.warn('[session:load] Ignoring invalid workspace session payload.');
+      return null;
+    }
+
+    return parsed;
+  } catch (error) {
+    const nodeError = error as NodeJS.ErrnoException;
+
+    if (nodeError.code === 'ENOENT') {
+      return null;
+    }
+
+    console.error('[session:load] Failed to read workspace session.', error);
+    return null;
+  }
+});
+
+ipcMain.handle('session:save', async (_, session: WorkspaceSession) => {
+  if (!isWorkspaceSession(session)) {
+    throw new Error('Invalid workspace session payload.');
+  }
+
+  const sessionFilePath = getSessionFilePath();
+  const directoryPath = path.dirname(sessionFilePath);
+  const tempFilePath = `${sessionFilePath}.tmp`;
+
+  await fs.mkdir(directoryPath, { recursive: true });
+  await fs.writeFile(tempFilePath, JSON.stringify(session, null, 2), 'utf8');
+  await fs.rename(tempFilePath, sessionFilePath);
 });
 
 ipcMain.handle('pty:create', async (_, input: TerminalCreateInput) => {

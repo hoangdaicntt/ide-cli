@@ -1,16 +1,18 @@
 import { useWorkspaceStore } from '../store/store';
+import { CloseIcon } from './FileTreeAssetIcons';
 
 export function HeaderTabs() {
   const projectIds = useWorkspaceStore((state) => state.projectIds);
   const projects = useWorkspaceStore((state) => state.projects);
   const activeProjectId = useWorkspaceStore((state) => state.activeProjectId);
   const openProject = useWorkspaceStore((state) => state.openProject);
+  const closeProject = useWorkspaceStore((state) => state.closeProject);
   const setActiveProject = useWorkspaceStore((state) => state.setActiveProject);
   const isOpeningProject = useWorkspaceStore((state) => state.isOpeningProject);
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-white/6 bg-white/[0.035] px-24 backdrop-blur-xl">
-      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+    <header className="flex h-12 items-center gap-3 border-b border-[#c9ced8] bg-[#e9edf2] pl-[84px] pr-3">
+      <div className="flex min-w-0 flex-1 items-end gap-px overflow-x-auto self-end">
         {projectIds.map((projectId) => {
           const project = projects[projectId];
           const isActive = projectId === activeProjectId;
@@ -21,19 +23,37 @@ export function HeaderTabs() {
               type="button"
               onClick={() => setActiveProject(projectId)}
               className={[
-                'group flex min-w-[180px] max-w-[260px] items-center gap-3 rounded-2xl border px-4 py-2.5 text-left transition',
+                'group flex min-w-[180px] max-w-[260px] items-center gap-2 border border-b-0 px-3 py-2 text-left text-[12px] transition',
                 isActive
-                  ? 'border-white/12 bg-white/12 text-white shadow-insetGlass'
-                  : 'border-transparent bg-white/[0.03] text-white/55 hover:bg-white/[0.06] hover:text-white/90',
+                  ? 'border-[#c9ced8] bg-[#f7f9fc] text-[#1f2329]'
+                  : 'border-transparent bg-[#dde3ea] text-[#596272] hover:bg-[#e3e8ef] hover:text-[#2a313c]',
               ].join(' ')}
             >
               <span
                 className={[
-                  'h-2.5 w-2.5 rounded-full',
-                  isActive ? 'bg-sky-400 shadow-[0_0_24px_rgba(56,189,248,0.75)]' : 'bg-white/20',
+                  'h-2 w-2 shrink-0 rounded-full',
+                  isActive ? 'bg-[#4d9df7]' : 'bg-[#97a3b6]',
                 ].join(' ')}
               />
-              <span className="truncate text-[13px] font-medium tracking-[0.01em]">{project.name}</span>
+              <span className="min-w-0 flex-1 truncate font-medium">{project.name}</span>
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void closeProject(projectId);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void closeProject(projectId);
+                  }
+                }}
+                className="flex h-4 w-4 shrink-0 items-center justify-center opacity-55 transition hover:opacity-100"
+              >
+                <CloseIcon />
+              </span>
             </button>
           );
         })}
@@ -44,9 +64,9 @@ export function HeaderTabs() {
         onClick={() => {
           void openProject();
         }}
-        className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2.5 text-[13px] font-medium text-white/90 transition hover:border-white/20 hover:bg-white/[0.1]"
+        className="h-8 border border-[#bfc7d3] bg-[#f6f8fb] px-3 text-[12px] font-medium text-[#2a313c] transition hover:bg-white"
       >
-        {isOpeningProject ? 'Opening...' : '+ Open Project'}
+        {isOpeningProject ? 'Opening...' : 'Open Project'}
       </button>
     </header>
   );
