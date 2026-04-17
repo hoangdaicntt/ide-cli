@@ -1,0 +1,46 @@
+{
+  "name": "ide-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phase 1 bootstrap for a premium multi-project Electron IDE workspace.",
+  "main": "dist-electron/electron/main.js",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/fix-node-pty.mjs",
+    "dev": "concurrently -k -n renderer,electron,app -c cyan,yellow,green \"npm:dev:renderer\" \"npm:dev:electron\" \"npm:dev:app\"",
+    "dev:renderer": "vite",
+    "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput",
+    "dev:app": "wait-on tcp:5173 file:dist-electron/electron/main.js && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electronmon dist-electron/electron/main.js",
+    "build": "npm run build:renderer && npm run build:electron",
+    "build:renderer": "tsc --noEmit -p tsconfig.app.json && vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.electron.json"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "electron": "^35.0.0",
+    "monaco-editor": "^0.52.0",
+    "node-pty": "^1.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.4.0",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electronmon": "^2.0.2",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "wait-on": "^8.0.1"
+  }
+}
