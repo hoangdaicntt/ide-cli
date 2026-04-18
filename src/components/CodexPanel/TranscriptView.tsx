@@ -1,3 +1,4 @@
+import { AlertCircle, Sparkles, UserRound } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { getDisplayNameFromPath } from '../../store/store';
 import { MarkdownContent, UserContent } from './MarkdownContent';
@@ -19,59 +20,70 @@ export function TranscriptView({
   ApprovalCard: ComponentType<{ projectId: string; request: any }>;
 }) {
   return (
-    <div className="mx-auto max-w-3xl">
-      {isLoadingHistory ? <div className="text-[13px] text-[#7c8591]">Loading thread history...</div> : null}
+    <div className="w-full">
+      {isLoadingHistory ? <div className="px-4 pb-3 text-[13px] text-[var(--shell-muted)]">Loading thread history...</div> : null}
       {transcript.length === 0 ? (
         <div className="px-4 py-8 text-center">
-          <div className="text-[13px] font-medium text-[#243040]">Start a Codex conversation</div>
-          <p className="mt-2 text-[13px] leading-6 text-[#677383]">
-            Select an agent, model, permission policy, attach files if needed, then send your prompt.
+          <div className="text-[13px] font-medium text-[var(--shell-text)]">Start a Codex conversation</div>
+          <p className="mt-2 text-[13px] leading-6 text-[var(--shell-muted)]">
+            Ask Codex to inspect, edit, or explain code. Use `@` to attach files into the current task context.
           </p>
         </div>
       ) : null}
       {previousMessageCount > 0 ? (
-        <div className="mb-6 flex items-center gap-2 py-1 text-[13px] text-[#8b9098]">
+        <div className="mb-4 flex items-center gap-2 px-4 py-1 text-[12px] text-[var(--shell-subtle)]">
           <div className="text-[13px]">{previousMessageCount} previous messages</div>
           <div className="text-[18px] leading-none text-[#b4bac3]">›</div>
         </div>
       ) : null}
       {transcript.map((entry, index) => {
-        const previousRole = index > 0 ? transcript[index - 1]?.role : null;
-        const showRoleLabel = previousRole !== entry.role;
-        const roleName = entry.role === 'user' ? 'You' : entry.role === 'assistant' ? 'Codex' : 'System';
+        const roleTone =
+          entry.role === 'user'
+            ? 'bg-[var(--shell-accent)] text-white'
+            : entry.role === 'system'
+              ? 'bg-[#fff2f2] text-[#b03447]'
+              : 'bg-[#e5e5e5] text-[var(--shell-accent)]';
+        const AvatarIcon = entry.role === 'user' ? UserRound : entry.role === 'system' ? AlertCircle : Sparkles;
 
         return (
-          <section key={entry.id} className={showRoleLabel ? 'pb-3 pt-7' : 'pb-3'}>
-            {showRoleLabel ? (
-              <div className="mb-2 text-[12px] font-medium text-[#8c939d]">
-                {roleName}
+          <section key={entry.id} className={index === 0 ? 'pb-4' : 'py-2'}>
+            <div className="flex gap-3 px-4">
+              <div
+                className={[
+                  'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded',
+                  roleTone,
+                ].join(' ')}
+              >
+                <AvatarIcon className="h-3.5 w-3.5" strokeWidth={2.1} />
               </div>
-            ) : null}
-            <div className={entry.role === 'user' ? 'pl-4' : ''}>
-              {entry.role === 'user' ? (
-                <UserContent text={entry.text} />
-              ) : (
-                <MarkdownContent text={entry.text} tone={entry.role === 'system' ? 'system' : 'default'} />
-              )}
-              {entry.role === 'user' && entry.attachments.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {entry.attachments.map((filePath) => (
-                    <span
-                      key={filePath}
-                      className="rounded-full border border-[#d7e3f3] bg-[#f4f8fd] px-2.5 py-1 text-[11px] text-[#3a5f8e]"
-                    >
-                      @{getDisplayNameFromPath(filePath)}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
+              <div className="min-w-0 flex-1 pt-0.5">
+                {entry.role === 'user' ? (
+                  <UserContent text={entry.text} />
+                ) : (
+                  <MarkdownContent text={entry.text} tone={entry.role === 'system' ? 'system' : 'default'} />
+                )}
+                {entry.role === 'user' && entry.attachments.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {entry.attachments.map((filePath) => (
+                      <span
+                        key={filePath}
+                        className="rounded-full border border-[#d9d9d9] bg-[#f7f7f7] px-2.5 py-1 text-[11px] text-[var(--shell-muted)]"
+                      >
+                        @{getDisplayNameFromPath(filePath)}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </section>
         );
       })}
-      {pendingRequests.map((request) => (
-        <ApprovalCard key={String(request.requestId)} projectId={projectId} request={request} />
-      ))}
+      <div className="px-4">
+        {pendingRequests.map((request) => (
+          <ApprovalCard key={String(request.requestId)} projectId={projectId} request={request} />
+        ))}
+      </div>
     </div>
   );
 }

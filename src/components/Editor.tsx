@@ -1,7 +1,7 @@
 import MonacoEditor, { type OnMount } from '@monaco-editor/react';
 import { useMemo } from 'react';
-import { CloseIcon } from './FileTreeAssetIcons';
-import { getActiveEditorTab, getRelativePath, useWorkspaceStore } from '../store/store';
+import { CloseIcon, TreeAssetIcon } from './FileTreeAssetIcons';
+import { getActiveEditorTab, useWorkspaceStore } from '../store/store';
 
 type EditorProps = {
   projectId: string;
@@ -12,11 +12,9 @@ function getLanguageFromPath(filePath: string): string {
 
   switch (extension) {
     case 'ts':
-      return 'typescript';
     case 'tsx':
       return 'typescript';
     case 'js':
-      return 'javascript';
     case 'jsx':
       return 'javascript';
     case 'json':
@@ -47,32 +45,32 @@ export function Editor({ projectId }: EditorProps) {
   const openTabs = useMemo(() => Object.values(project?.openFiles ?? {}), [project?.openFiles]);
 
   const handleMount: OnMount = (_editor, monaco) => {
-    monaco.editor.defineTheme('jetbrains-light', {
+    monaco.editor.defineTheme('demo-light', {
       base: 'vs',
       inherit: true,
       rules: [],
       colors: {
         'editor.background': '#ffffff',
-        'editor.foreground': '#1f2329',
-        'editorLineNumber.foreground': '#9aa4b2',
-        'editorLineNumber.activeForeground': '#5f6b7a',
-        'editorCursor.foreground': '#1f78d1',
-        'editor.selectionBackground': '#cfe8ff',
-        'editor.inactiveSelectionBackground': '#e6f2ff',
-        'editorIndentGuide.background1': '#edf1f5',
-        'editorIndentGuide.activeBackground1': '#cad3dd',
+        'editor.foreground': '#333333',
+        'editorLineNumber.foreground': '#237893',
+        'editorLineNumber.activeForeground': '#0451a5',
+        'editorCursor.foreground': '#1f1f1f',
+        'editor.selectionBackground': '#d8e8ff',
+        'editor.inactiveSelectionBackground': '#e8f1ff',
+        'editorIndentGuide.background1': '#efefef',
+        'editorIndentGuide.activeBackground1': '#d9d9d9',
       },
     });
 
-    monaco.editor.setTheme('jetbrains-light');
+    monaco.editor.setTheme('demo-light');
   };
 
   if (!activeTab) {
     return (
       <div className="flex h-full items-center justify-center bg-white">
         <div className="max-w-sm text-center">
-          <p className="text-lg font-medium text-[#1f2329]">Select a file to start editing</p>
-          <p className="mt-2 text-sm leading-6 text-[#6b7280]">
+          <p className="text-lg font-medium text-[var(--shell-text)]">Select a file to start editing</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--shell-muted)]">
             Open any file from the project tree to load it into the central editor pane.
           </p>
         </div>
@@ -82,8 +80,8 @@ export function Editor({ projectId }: EditorProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
-      <div className="border-b border-[#d4dae3] bg-[#f8fafc]">
-        <div className="flex min-w-0 overflow-x-auto px-2 pt-2">
+      <div className="border-b border-[var(--shell-border)] bg-[var(--panel-muted-bg)]">
+        <div className="flex min-w-0 overflow-x-auto no-scrollbar">
           {openTabs.map((tab) => {
             const isActive = tab.path === activeTab.path;
 
@@ -93,14 +91,15 @@ export function Editor({ projectId }: EditorProps) {
                 type="button"
                 onClick={() => setActiveFile(projectId, tab.path)}
                 className={[
-                  'group mr-1 flex h-9 min-w-0 max-w-[220px] items-center gap-2 border border-b-0 px-3 text-left text-[12px] transition',
+                  'group flex h-9 min-w-0 max-w-[220px] items-center gap-2 border-r border-[var(--shell-border)] px-3 text-left text-[13px] transition',
                   isActive
-                    ? 'border-[#d4dae3] bg-white text-[#1f2329]'
-                    : 'border-transparent bg-[#eef2f7] text-[#5d6674] hover:bg-[#f3f6fa]',
+                    ? 'border-t-2 border-t-[var(--shell-accent)] bg-white text-black'
+                    : 'border-t-2 border-t-transparent text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]',
                 ].join(' ')}
               >
-                <span className="truncate">{tab.name}</span>
-                {tab.isDirty ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#4d9df7]" /> : null}
+                <TreeAssetIcon fileName={tab.name} className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{tab.name}</span>
+                {tab.isDirty ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--shell-accent)]" /> : null}
                 <span
                   role="button"
                   tabIndex={0}
@@ -115,7 +114,7 @@ export function Editor({ projectId }: EditorProps) {
                       closeFile(projectId, tab.path);
                     }
                   }}
-                  className="flex h-4 w-4 shrink-0 items-center justify-center opacity-45 transition hover:opacity-100"
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded opacity-50 transition hover:bg-[#e8e8e8] hover:opacity-100"
                 >
                   <CloseIcon className="h-3 w-3" />
                 </span>
@@ -123,20 +122,11 @@ export function Editor({ projectId }: EditorProps) {
             );
           })}
         </div>
-
-        <div className="flex h-8 items-center justify-between border-t border-[#edf1f5] px-3">
-          <div className="truncate text-[11px] text-[#7b8594]">
-            {getRelativePath(project?.rootPath ?? '', activeTab.path)}
-          </div>
-          <div className="border border-[#d2d8e1] bg-white px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[#6b7280]">
-            {getLanguageFromPath(activeTab.path)}
-          </div>
-        </div>
       </div>
 
       <MonacoEditor
         path={activeTab.path}
-        theme="jetbrains-light"
+        theme="demo-light"
         language={getLanguageFromPath(activeTab.path)}
         value={activeTab.content}
         onMount={handleMount}
@@ -146,14 +136,15 @@ export function Editor({ projectId }: EditorProps) {
         options={{
           automaticLayout: true,
           fontFamily: 'JetBrains Mono, SF Mono, Menlo, monospace',
-          fontSize: 13,
+          fontSize: 14,
+          lineHeight: 22,
           minimap: { enabled: false },
           smoothScrolling: false,
           roundedSelection: true,
           cursorBlinking: 'blink',
           scrollBeyondLastLine: false,
           wordWrap: 'off',
-          padding: { top: 12, bottom: 12 },
+          padding: { top: 14, bottom: 14 },
         }}
       />
     </div>

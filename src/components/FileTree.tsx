@@ -1,3 +1,4 @@
+import { MoreHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { DirectoryNode, FileNode } from '../shared/ipc';
 import { useWorkspaceStore } from '../store/store';
@@ -49,11 +50,12 @@ function TreeNode({
           void openFile(projectId, node);
         }}
         className={[
-          'flex w-full items-center gap-2 px-2 py-1.5 text-left text-[13px] leading-5 transition',
-          isActive ? 'bg-[#dbeafe] text-[#12447f]' : 'text-[#3b4350] hover:bg-[#edf2f8] hover:text-[#1f2329]',
+          'flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] leading-5 transition',
+          isActive ? 'bg-[var(--shell-selected)] text-black' : 'text-[var(--shell-text)] hover:bg-[var(--shell-hover)]',
         ].join(' ')}
         style={{ paddingLeft: 10 + depth * 16 }}
       >
+        <span className="w-4 shrink-0" />
         <TreeAssetIcon fileName={node.name} />
         <span className="truncate">{node.name}</span>
       </button>
@@ -61,20 +63,23 @@ function TreeNode({
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       <button
         type="button"
         onClick={() => onToggle(node.path)}
-        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[13px] font-medium text-[#38404d] transition hover:bg-[#edf2f8] hover:text-[#1f2329]"
+        className={[
+          'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[13px] transition hover:bg-[var(--shell-hover)]',
+          depth === 0 ? 'font-semibold text-[var(--shell-text)]' : 'font-medium text-[var(--shell-text)]',
+        ].join(' ')}
         style={{ paddingLeft: 10 + depth * 16 }}
       >
         <ArrowExpandIcon expanded={isExpanded} className="h-3 w-3 shrink-0 opacity-70" />
         <TreeAssetIcon isFolder />
-        <span className="truncate font-medium">{node.name}</span>
+        <span className="truncate">{node.name}</span>
       </button>
 
-      {isExpanded && (
-        <div className="space-y-1">
+      {isExpanded ? (
+        <div className="space-y-0.5">
           {sortTreeNodes(node.children).map((child) => (
             <TreeNode
               key={child.path}
@@ -87,7 +92,7 @@ function TreeNode({
             />
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -115,11 +120,19 @@ export function FileTree({ projectId, nodes, activeFilePath }: FileTreeProps) {
   };
 
   return (
-    <div className="h-full overflow-auto bg-[#f5f7fa] px-2 py-2">
-      <div className="mb-2 border-b border-[#d8dde6] px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6c7686]">
-        Files
+    <div className="flex h-full flex-col overflow-hidden bg-[var(--panel-muted-bg)]">
+      <div className="app-drag-region flex items-center justify-between px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--shell-muted)]">
+        <span>Tập tin (Explorer)</span>
+        <button
+          type="button"
+          aria-label="Explorer options"
+          className="app-no-drag flex h-6 w-6 items-center justify-center rounded text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
+        >
+          <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2} />
+        </button>
       </div>
-      <div className="space-y-1">
+
+      <div className="flex-1 overflow-auto px-2 pb-4 text-[13px] custom-scrollbar">
         {sortedNodes.map((node) => (
           <TreeNode
             key={node.path}

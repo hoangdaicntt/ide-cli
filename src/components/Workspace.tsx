@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ActivityBar } from './ActivityBar';
 import { CodexPanel } from './CodexPanel/index';
 import { Editor } from './Editor';
 import { FileTree } from './FileTree';
@@ -11,6 +12,9 @@ type WorkspaceProps = {
 };
 
 type ResizeTarget = 'sidebar' | 'codex' | 'files' | 'editor-terminal' | null;
+
+const ACTIVITY_BAR_WIDTH = 40;
+const SPLITTER_SIZE = 5;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -35,20 +39,20 @@ export function Workspace({ project }: WorkspaceProps) {
       }
 
       if (resizing === 'files') {
-        setFilesWidth(clamp(window.innerWidth - event.clientX - 8, 220, 360));
+        setFilesWidth(clamp(window.innerWidth - event.clientX - ACTIVITY_BAR_WIDTH - 8, 220, 360));
         return;
       }
 
       if (resizing === 'codex') {
-        const availableWidth = window.innerWidth - sidebarWidth - filesWidth - 24;
-        const nextCodexWidth = event.clientX - sidebarWidth - 4;
+        const availableWidth = window.innerWidth - sidebarWidth - filesWidth - ACTIVITY_BAR_WIDTH - SPLITTER_SIZE * 3;
+        const nextCodexWidth = event.clientX - sidebarWidth - SPLITTER_SIZE;
 
-        setCodexWidth(clamp(nextCodexWidth, 320, Math.max(320, availableWidth - 320)));
+        setCodexWidth(clamp(nextCodexWidth, 320, Math.max(320, availableWidth - 360)));
         return;
       }
 
-      const nextEditorHeight = event.clientY - 4;
-      setEditorHeight(clamp(nextEditorHeight, 180, Math.max(180, window.innerHeight - 240)));
+      const nextEditorHeight = event.clientY - SPLITTER_SIZE;
+      setEditorHeight(clamp(nextEditorHeight, 180, Math.max(180, window.innerHeight - 220)));
     };
 
     const handlePointerUp = () => {
@@ -65,11 +69,14 @@ export function Workspace({ project }: WorkspaceProps) {
   }, [resizing]);
 
   useEffect(() => {
-    const availableWidth = Math.max(window.innerWidth - sidebarWidth - filesWidth - 24, 640);
+    const availableWidth = Math.max(
+      window.innerWidth - sidebarWidth - filesWidth - ACTIVITY_BAR_WIDTH - SPLITTER_SIZE * 3,
+      680,
+    );
 
     setCodexWidth((current) => {
       if (current > 0) {
-        return clamp(current, 320, Math.max(320, availableWidth - 320));
+        return clamp(current, 320, Math.max(320, availableWidth - 360));
       }
 
       return Math.max(320, Math.floor(availableWidth / 2));
@@ -78,7 +85,7 @@ export function Workspace({ project }: WorkspaceProps) {
 
   useEffect(() => {
     setEditorHeight((current) => {
-      const availableHeight = Math.max(window.innerHeight - 4, 480);
+      const availableHeight = Math.max(window.innerHeight - SPLITTER_SIZE, 480);
 
       if (current > 0) {
         return clamp(current, 180, availableHeight - 180);
@@ -90,9 +97,9 @@ export function Workspace({ project }: WorkspaceProps) {
 
   return (
     <section className="h-full">
-      <div className="flex h-full min-h-0 overflow-hidden">
+      <div className="flex h-full min-h-0 overflow-hidden bg-[var(--shell-canvas)]">
         <aside
-          className="min-h-0 border-r border-[#d4dae3] bg-[#f5f7fa]"
+          className="min-h-0 border-r border-[var(--shell-border)] bg-[var(--panel-muted-bg)]"
           style={{ width: sidebarWidth }}
         >
           <WorkspaceSidebar projectId={project.id} />
@@ -102,11 +109,11 @@ export function Workspace({ project }: WorkspaceProps) {
           type="button"
           aria-label="Resize workspace sidebar"
           onMouseDown={() => setResizing('sidebar')}
-          className="w-1 cursor-col-resize bg-[#d4dae3] transition hover:bg-[#9eb7d4]"
+          className="panel-resize-handle"
         />
 
         <aside
-          className="min-h-0 border-r border-[#d4dae3] bg-[#fbfcfe]"
+          className="min-h-0 border-r border-[var(--shell-border)] bg-[var(--panel-bg)]"
           style={{ width: codexWidth }}
         >
           <CodexPanel projectId={project.id} rootPath={project.rootPath} tree={project.tree} />
@@ -116,10 +123,10 @@ export function Workspace({ project }: WorkspaceProps) {
           type="button"
           aria-label="Resize Codex panel"
           onMouseDown={() => setResizing('codex')}
-          className="w-1 cursor-col-resize bg-[#d4dae3] transition hover:bg-[#9eb7d4]"
+          className="panel-resize-handle"
         />
 
-        <main className="min-w-0 flex-1 bg-white">
+        <main className="min-w-0 flex-1 bg-[var(--panel-bg)]">
           <div className="flex h-full min-h-0 flex-col overflow-hidden">
             <div className="min-h-0" style={{ height: editorHeight }}>
               <Editor projectId={project.id} />
@@ -129,10 +136,10 @@ export function Workspace({ project }: WorkspaceProps) {
               type="button"
               aria-label="Resize editor and terminal"
               onMouseDown={() => setResizing('editor-terminal')}
-              className="h-1 cursor-row-resize bg-[#d4dae3] transition hover:bg-[#9eb7d4]"
+              className="panel-resize-handle-horizontal"
             />
 
-            <div className="min-h-0 flex-1 border-t border-[#d4dae3]">
+            <div className="min-h-0 flex-1 border-t border-[var(--shell-border)]">
               <Terminal projectId={project.id} />
             </div>
           </div>
@@ -142,11 +149,11 @@ export function Workspace({ project }: WorkspaceProps) {
           type="button"
           aria-label="Resize file tree"
           onMouseDown={() => setResizing('files')}
-          className="w-1 cursor-col-resize bg-[#d4dae3] transition hover:bg-[#9eb7d4]"
+          className="panel-resize-handle"
         />
 
         <aside
-          className="min-h-0 border-l border-[#d4dae3] bg-[#f5f7fa]"
+          className="min-h-0 border-l border-[var(--shell-border)] bg-[var(--panel-muted-bg)]"
           style={{ width: filesWidth }}
         >
           <FileTree
@@ -155,6 +162,8 @@ export function Workspace({ project }: WorkspaceProps) {
             activeFilePath={project.activeFilePath}
           />
         </aside>
+
+        <ActivityBar />
       </div>
     </section>
   );

@@ -4,8 +4,22 @@
 
 :root {
   color-scheme: light;
-  font-family: 'JetBrains Sans', 'Segoe UI', system-ui, sans-serif;
-  background: #dfe3ea;
+  font-family: 'Segoe UI', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  background: #ffffff;
+  --shell-canvas: #ffffff;
+  --panel-bg: #ffffff;
+  --panel-muted-bg: #f3f3f3;
+  --rail-bg: #e8e8e8;
+  --rail-active-bg: #e4e6f1;
+  --shell-border: #e5e5e5;
+  --shell-border-strong: #d6d6d6;
+  --shell-text: #333333;
+  --shell-muted: #666666;
+  --shell-subtle: #8a8a8a;
+  --shell-accent: #007acc;
+  --shell-hover: #e8e8e8;
+  --shell-selected: #e4e6f1;
+  --shell-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 html,
@@ -17,8 +31,8 @@ body,
 }
 
 body {
-  background: #dfe3ea;
-  color: #1f2329;
+  background: var(--shell-canvas);
+  color: var(--shell-text);
 }
 
 * {
@@ -50,14 +64,71 @@ select {
 }
 
 ::-webkit-scrollbar-track {
-  background: #eef1f5;
+  background: #f4f4f4;
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 2px solid #eef1f5;
+  border: 2px solid #f4f4f4;
   border-radius: 999px;
-  background: rgba(119, 130, 148, 0.4);
+  background: rgba(125, 125, 125, 0.28);
   background-clip: padding-box;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.custom-scrollbar {
+  scrollbar-color: rgba(125, 125, 125, 0.28) #f4f4f4;
+}
+
+.panel-resize-handle {
+  position: relative;
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.panel-resize-handle::before {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  width: 1px;
+  height: 100%;
+  background: var(--shell-border);
+  content: '';
+  transition: background-color 120ms ease;
+}
+
+.panel-resize-handle:hover::before {
+  background: color-mix(in srgb, var(--shell-accent) 35%, white);
+}
+
+.panel-resize-handle-horizontal {
+  position: relative;
+  height: 5px;
+  cursor: row-resize;
+  background: transparent;
+}
+
+.panel-resize-handle-horizontal::before {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--shell-border);
+  content: '';
+  transition: background-color 120ms ease;
+}
+
+.panel-resize-handle-horizontal:hover::before {
+  background: color-mix(in srgb, var(--shell-accent) 35%, white);
 }
 
 .xterm {

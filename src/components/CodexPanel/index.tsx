@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { DirectoryNode } from '../../shared/ipc';
-import { flattenFiles, getRelativePath } from '../../store/store';
+import { flattenFiles, getDisplayNameFromPath, getRelativePath } from '../../store/store';
 import { useCodexStore } from '../../store/codexStore';
 import { ApprovalCard } from './ApprovalCard';
 import { CodexComposer } from './Composer';
@@ -24,6 +24,8 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const setSelectedModel = useCodexStore((state) => state.setSelectedModel);
   const setSelectedReasoningEffort = useCodexStore((state) => state.setSelectedReasoningEffort);
   const setSelectedApprovalPolicy = useCodexStore((state) => state.setSelectedApprovalPolicy);
+  const toggleAttachedFile = useCodexStore((state) => state.toggleAttachedFile);
+  const removeAttachedFile = useCodexStore((state) => state.removeAttachedFile);
   const loadProjectThreads = useCodexStore((state) => state.loadProjectThreads);
   const sendPrompt = useCodexStore((state) => state.sendPrompt);
   const interruptTurn = useCodexStore((state) => state.interruptTurn);
@@ -62,12 +64,22 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const selectedApprovalPolicy = projectState?.selectedApprovalPolicy ?? 'on-request';
   const draft = projectState?.draft ?? '';
   const messages = projectState?.messages ?? [];
+  const attachedFilePaths = projectState?.attachedFilePaths ?? [];
   const pendingRequests = projectState?.pendingRequests ?? [];
   const isLoadingHistory = projectState?.isLoadingHistory ?? false;
   const isSending = projectState?.isSending ?? false;
   const canInterrupt = Boolean(projectState?.threadId && projectState?.activeTurnId);
   const transcript = useMemo(() => buildTranscript(messages), [messages]);
   const previousMessageCount = Math.max(transcript.length - 1, 0);
+  const attachedFiles = useMemo(
+    () =>
+      attachedFilePaths.map((filePath) => ({
+        path: filePath,
+        name: getDisplayNameFromPath(filePath),
+        relativePath: getRelativePath(rootPath, filePath),
+      })),
+    [attachedFilePaths, rootPath],
+  );
 
   useEffect(() => {
     if (!projectState?.selectedModel && selectedModel) {
@@ -119,7 +131,11 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
 
     const relativePath = selectedPath.startsWith(rootPath) ? selectedPath.slice(rootPath.length + 1) : selectedPath;
 
-    setDraft(projectId, replaceMentionDraft(draft, relativePath));
+    if (!attachedFilePaths.includes(selectedPath)) {
+      toggleAttachedFile(projectId, selectedPath);
+    }
+
+    setDraft(projectId, replaceMentionDraft(draft, `@${relativePath}`));
     setPickerOpen(false);
     setFileQuery('');
     setHighlightedFileIndex(0);
@@ -127,14 +143,14 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   };
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[#fcfcfd]">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[var(--panel-bg)]">
       <CodexHeader
         rootPath={rootPath}
         connectionStatus={connectionStatus}
         connectionError={connectionError}
       />
 
-      <div ref={timelineRef} className="flex-1 overflow-auto px-8 py-6">
+      <div ref={timelineRef} className="flex-1 overflow-auto px-4 py-4 custom-scrollbar">
         <TranscriptView
           transcript={transcript}
           pendingRequests={pendingRequests}
@@ -154,6 +170,7 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
         selectedModel={selectedModel}
         selectedReasoningEffort={selectedReasoningEffort}
         selectedApprovalPolicy={selectedApprovalPolicy}
+        attachedFiles={attachedFiles}
         isMentionActive={pickerOpen}
         mentionFiles={filteredFiles}
         highlightedMentionIndex={highlightedFileIndex}
@@ -172,6 +189,7 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
         onSelectModel={(value) => setSelectedModel(projectId, value)}
         onSelectReasoningEffort={(value) => setSelectedReasoningEffort(projectId, value)}
         onSelectApprovalPolicy={(value) => setSelectedApprovalPolicy(projectId, value)}
+        onRemoveAttachment={(filePath) => removeAttachedFile(projectId, filePath)}
         onMentionQueryChange={(value) => {
           if (value === null) {
             setPickerOpen(false);

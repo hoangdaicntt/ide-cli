@@ -5,13 +5,13 @@ export function ApprovalCard({ projectId, request }: { projectId: string; reques
   const resolvePendingRequest = useCodexStore((state) => state.resolvePendingRequest);
 
   return (
-    <div className="my-6 border-l-2 border-[#f2c08c] bg-[#fff7ec] px-4 py-3">
+    <div className="my-6 rounded-[14px] border border-[#f1dcc0] bg-[#fff9f1] px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f5c1d]">Approval</div>
           <div className="mt-1 text-sm font-medium text-[#3a2c1e]">{request.method}</div>
         </div>
-        <div className="border border-[#efcf9e] bg-white px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-[#8f5c1d]">
+        <div className="rounded-full border border-[#efcf9e] bg-white px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-[#8f5c1d]">
           pending
         </div>
       </div>
