@@ -1,3 +1,16 @@
+import type {
+  CodexMode,
+  CodexModel,
+  CodexNotification,
+  CodexResolveServerRequestInput,
+  CodexServerRequest,
+  CodexThread,
+  CodexThreadListInput,
+  CodexThreadStartInput,
+  CodexTurn,
+  CodexTurnStartInput,
+} from './codex.js';
+
 export type Platform = string;
 export type WorkspaceSessionVersion = 1;
 
@@ -82,6 +95,18 @@ export type ElectronAPI = {
   writeTerminal: (input: TerminalWriteInput) => Promise<void>;
   resizeTerminal: (input: TerminalResizeInput) => Promise<void>;
   killTerminal: (terminalId: string) => Promise<void>;
+  codexConnect: () => Promise<void>;
+  codexListModels: () => Promise<CodexModel[]>;
+  codexListModes: () => Promise<CodexMode[]>;
+  codexListThreads: (input: CodexThreadListInput) => Promise<CodexThread[]>;
+  codexReadThread: (input: { threadId: string; includeTurns?: boolean }) => Promise<CodexThread>;
+  codexStartThread: (input: CodexThreadStartInput) => Promise<CodexThread>;
+  codexResumeThread: (threadId: string) => Promise<CodexThread>;
+  codexStartTurn: (input: CodexTurnStartInput) => Promise<CodexTurn>;
+  codexInterruptTurn: (input: { threadId: string; turnId: string }) => Promise<void>;
+  codexResolveServerRequest: (input: CodexResolveServerRequestInput) => Promise<void>;
+  onCodexEvent: (listener: (event: CodexNotification) => void) => () => void;
+  onCodexServerRequest: (listener: (request: CodexServerRequest) => void) => () => void;
   onTerminalData: (listener: (payload: TerminalOutputPayload) => void) => () => void;
   onTerminalExit: (listener: (payload: TerminalExitPayload) => void) => () => void;
 };

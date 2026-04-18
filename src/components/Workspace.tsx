@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
+import { CodexPanel } from './CodexPanel/index';
 import { Editor } from './Editor';
 import { FileTree } from './FileTree';
-import { Terminal } from './Terminal';
 import type { ProjectWorkspace } from '../store/store';
 
 type WorkspaceProps = {
@@ -82,7 +82,7 @@ export function Workspace({ project }: WorkspaceProps) {
           className="min-h-0 border-l border-[#d4dae3] bg-[#fbfcfe]"
           style={{ width: rightWidth }}
         >
-          <Terminal projectId={project.id} />
+          <CodexPanel projectId={project.id} rootPath={project.rootPath} tree={project.tree} />
         </aside>
       </div>
     </section>

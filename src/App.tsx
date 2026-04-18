@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { TerminalAssetIcon } from './components/FileTreeAssetIcons';
 import { HeaderTabs } from './components/HeaderTabs';
 import { Workspace } from './components/Workspace';
+import { initializeCodexEventBindings, initializeCodexPersistence, useCodexStore } from './store/codexStore';
 import { initializeWorkspacePersistence, useWorkspaceStore } from './store/store';
 
 function EmptyState() {
@@ -13,7 +14,7 @@ function EmptyState() {
         </div>
         <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#1f2329]">Open a project to start working.</h1>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#687384]">
-          The workspace is organized like a JetBrains IDE with a project tree on the left, the editor in the center, and a terminal tool window on the right.
+          The workspace is organized with a project tree on the left, the editor in the center, and a Codex workspace on the right.
         </p>
       </div>
     </div>
@@ -27,13 +28,17 @@ export default function App() {
   const handleTerminalExit = useWorkspaceStore((state) => state.handleTerminalExit);
   const hasHydratedWorkspace = useWorkspaceStore((state) => state.hasHydratedWorkspace);
   const hydrateWorkspace = useWorkspaceStore((state) => state.hydrateWorkspace);
+  const initializeCodex = useCodexStore((state) => state.initialize);
 
   const activeProject = activeProjectId ? projects[activeProjectId] ?? null : null;
 
   useEffect(() => {
     initializeWorkspacePersistence();
+    initializeCodexEventBindings();
+    initializeCodexPersistence();
     void hydrateWorkspace();
-  }, [hydrateWorkspace]);
+    void initializeCodex();
+  }, [hydrateWorkspace, initializeCodex]);
 
   useEffect(() => {
     const dispose = window.electronAPI.onTerminalExit((payload) => {

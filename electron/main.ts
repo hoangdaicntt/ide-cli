@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import pty, { type IPty } from 'node-pty';
+import { CodexAppServerManager } from './codexAppServer.js';
 import type {
   DirectoryNode,
   FileNode,
@@ -19,6 +20,7 @@ import type {
   TerminalWriteInput,
   WorkspaceSession,
 } from '../src/shared/ipc.js';
+import type { CodexMode, CodexModel } from '../src/shared/codex.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +42,7 @@ type TerminalSession = {
 
 const terminalSessions = new Map<string, TerminalSession>();
 let mainWindow: BrowserWindow | null = null;
+const codexAppServer = new CodexAppServerManager(() => mainWindow);
 
 async function createDirectoryNode(targetPath: string): Promise<DirectoryNode | FileNode | null> {
   const stats = await fs.lstat(targetPath);
@@ -394,4 +397,46 @@ ipcMain.handle('pty:resize', async (_, input: TerminalResizeInput) => {
 
 ipcMain.handle('pty:kill', async (_, terminalId: string) => {
   destroyTerminal(terminalId);
+});
+
+ipcMain.handle('codex:connect', async () => {
+  await codexAppServer.connect();
+});
+
+ipcMain.handle('codex:list-models', async () => {
+  const models = await codexAppServer.listModels();
+  return models as CodexModel[];
+});
+
+ipcMain.handle('codex:list-modes', async () => {
+  const modes = await codexAppServer.listModes();
+  return modes as CodexMode[];
+});
+
+ipcMain.handle('codex:list-threads', async (_, input) => {
+  return codexAppServer.listThreads(input);
+});
+
+ipcMain.handle('codex:thread-read', async (_, input) => {
+  return codexAppServer.readThread(input);
+});
+
+ipcMain.handle('codex:thread-start', async (_, input) => {
+  return codexAppServer.startThread(input);
+});
+
+ipcMain.handle('codex:thread-resume', async (_, threadId: string) => {
+  return codexAppServer.resumeThread(threadId);
+});
+
+ipcMain.handle('codex:turn-start', async (_, input) => {
+  return codexAppServer.startTurn(input);
+});
+
+ipcMain.handle('codex:turn-interrupt', async (_, input) => {
+  await codexAppServer.interruptTurn(input);
+});
+
+ipcMain.handle('codex:server-request-resolve', async (_, input) => {
+  await codexAppServer.resolveServerRequest(input);
 });
