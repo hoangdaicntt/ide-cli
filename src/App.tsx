@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { TerminalAssetIcon } from './components/FileTreeAssetIcons';
-import { HeaderTabs } from './components/HeaderTabs';
 import { Workspace } from './components/Workspace';
 import { initializeCodexEventBindings, initializeCodexPersistence, useCodexStore } from './store/codexStore';
 import { initializeWorkspacePersistence, useWorkspaceStore } from './store/store';
@@ -14,7 +13,8 @@ function EmptyState() {
         </div>
         <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#1f2329]">Open a project to start working.</h1>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#687384]">
-          The workspace is organized with a project tree on the left, the editor in the center, and a Codex workspace on the right.
+          The workspace is organized with workspaces and tasks on the left, Codex beside it, the editor and terminal in the
+          middle, and files on the right.
         </p>
       </div>
     </div>
@@ -63,17 +63,12 @@ export default function App() {
 
   return (
     <div className="h-screen overflow-hidden bg-[#dfe3ea] text-[#1f2329]">
-      <div className="flex h-full flex-col">
-        <HeaderTabs />
-        <div className="min-h-0 flex-1">
-          <div className="h-full overflow-hidden border-t border-[#f7f9fc]">
-            {projectIds.length === 0 ? (
-              <EmptyState />
-            ) : activeProject ? (
-              <Workspace project={activeProject} />
-            ) : null}
-          </div>
-        </div>
+      <div className="h-full overflow-hidden">
+        {projectIds.length === 0 ? (
+          <EmptyState />
+        ) : activeProject ? (
+          <Workspace project={activeProject} />
+        ) : null}
       </div>
     </div>
   );

@@ -29,8 +29,6 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const setSelectedApprovalPolicy = useCodexStore((state) => state.setSelectedApprovalPolicy);
   const setSelectedSandboxMode = useCodexStore((state) => state.setSelectedSandboxMode);
   const loadProjectThreads = useCodexStore((state) => state.loadProjectThreads);
-  const selectThread = useCodexStore((state) => state.selectThread);
-  const newChat = useCodexStore((state) => state.newChat);
   const sendPrompt = useCodexStore((state) => state.sendPrompt);
   const interruptTurn = useCodexStore((state) => state.interruptTurn);
   const toggleAttachedFile = useCodexStore((state) => state.toggleAttachedFile);
@@ -69,11 +67,9 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const attachedFilePaths = projectState?.attachedFilePaths ?? [];
   const messages = projectState?.messages ?? [];
   const pendingRequests = projectState?.pendingRequests ?? [];
-  const threadSummaries = projectState?.threadSummaries ?? [];
   const isLoadingHistory = projectState?.isLoadingHistory ?? false;
   const isSending = projectState?.isSending ?? false;
   const canInterrupt = Boolean(projectState?.threadId && projectState?.activeTurnId);
-  const activeThreadId = projectState?.threadId ?? '';
   const transcript = useMemo(() => buildTranscript(messages), [messages]);
   const previousMessageCount = Math.max(transcript.length - 1, 0);
 
@@ -115,17 +111,6 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
         rootPath={rootPath}
         connectionStatus={connectionStatus}
         connectionError={connectionError}
-        threadSummaries={threadSummaries}
-        activeThreadId={activeThreadId}
-        onNewChat={() => newChat(projectId)}
-        onSelectThread={(threadId) => {
-          if (!threadId) {
-            newChat(projectId);
-            return;
-          }
-
-          void selectThread({ projectId, threadId });
-        }}
       />
 
       <div ref={timelineRef} className="flex-1 overflow-auto px-8 py-6">

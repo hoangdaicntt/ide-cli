@@ -103,7 +103,7 @@ export function FileTree({ projectId, nodes, activeFilePath }: FileTreeProps) {
   return (
     <div className="h-full overflow-auto bg-[#f5f7fa] px-2 py-2">
       <div className="mb-2 border-b border-[#d8dde6] px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6c7686]">
-        Project
+        Files
       </div>
       <div className="space-y-1">
         {nodes.map((node) => (
