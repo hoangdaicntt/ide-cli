@@ -37,6 +37,7 @@ export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
   const newChat = useCodexStore((state) => state.newChat);
   const loadProjectThreads = useCodexStore((state) => state.loadProjectThreads);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => new Set(projectIds));
+  const [menuThreadId, setMenuThreadId] = useState<string | null>(null);
 
   const toggleProject = (id: string) => {
     setExpandedProjects((previous) => {
@@ -126,7 +127,6 @@ export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
                       className="min-w-0 flex-1 text-left"
                     >
                       <div className="truncate text-[12px] font-medium">{project.name}</div>
-                      <div className="mt-0.5 truncate text-[11px] text-[#8a94a4]">{project.rootPath}</div>
                     </button>
 
                     <span
@@ -150,7 +150,7 @@ export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
                   </div>
 
                   {isExpanded ? (
-                    <div className="ml-4 border-l border-[#d8dde6] pl-2">
+                    <div className="ml-4 pl-2">
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-2 px-2 py-1">
                           <div className="text-[11px] uppercase tracking-[0.08em] text-[#8a94a4]">
@@ -168,49 +168,68 @@ export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
                           </button>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveProject(id);
-                            newChat(id);
-                          }}
-                          className={[
-                            'w-full px-2 py-2 text-left transition',
-                            isActiveProject && activeThreadId === null
-                              ? 'bg-white text-[#1f2329]'
-                              : 'text-[#596272] hover:bg-[#eef2f7]',
-                          ].join(' ')}
-                        >
-                          <div className="truncate text-[12px] font-medium">Current Draft</div>
-                          <div className="mt-0.5 text-[11px] text-[#8a94a4]">New task</div>
-                        </button>
-
                         {orderedThreads.map((thread) => {
                           const isActiveThread = isActiveProject && thread.id === activeThreadId;
+                          const isProcessing =
+                            isActiveProject &&
+                            thread.id === activeThreadId &&
+                            Boolean(projectStates[id]?.activeTurnId || projectStates[id]?.isSending);
 
                           return (
-                            <button
+                            <div
                               key={thread.id}
-                              type="button"
-                              onClick={() => {
-                                setActiveProject(id);
-                                void selectThread({ projectId: id, threadId: thread.id });
-                              }}
                               className={[
-                                'w-full px-2 py-2 text-left transition',
+                                'group relative flex items-start gap-2 rounded-md px-2 py-2 transition',
                                 isActiveThread
-                                  ? 'bg-white text-[#1f2329]'
+                                  ? 'bg-white text-[#1f2329] shadow-[inset_0_0_0_1px_#d9e1eb]'
                                   : 'text-[#596272] hover:bg-[#eef2f7]',
                               ].join(' ')}
                             >
-                              <div className="truncate text-[12px] font-medium">{getTaskLabel(thread)}</div>
-                              <div className="mt-0.5 truncate text-[11px] text-[#8a94a4]">
-                                {thread.preview || thread.cwd || 'No preview available'}
-                              </div>
-                              <div className="mt-1 text-[10px] uppercase tracking-[0.08em] text-[#98a2b3]">
-                                {formatTaskTime(thread.updatedAt ?? thread.createdAt)}
-                              </div>
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveProject(id);
+                                  void selectThread({ projectId: id, threadId: thread.id });
+                                }}
+                                className="min-w-0 flex-1 text-left"
+                              >
+                                <div className="truncate text-[12px] font-medium">{getTaskLabel(thread)}</div>
+                                <div className="mt-1 flex items-center gap-2 text-[11px] text-[#8a94a4]">
+                                  {isProcessing ? (
+                                    <>
+                                      <span className="h-1.5 w-1.5 rounded-full bg-[#1f78d1]" />
+                                      <span>Processing</span>
+                                    </>
+                                  ) : null}
+                                  <span>{formatTaskTime(thread.updatedAt ?? thread.createdAt)}</span>
+                                </div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setMenuThreadId((current) => (current === thread.id ? null : thread.id))}
+                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#8a94a4] opacity-0 transition hover:bg-[#e7ecf3] hover:text-[#4f5968] group-hover:opacity-100"
+                              >
+                                ...
+                              </button>
+                              {menuThreadId === thread.id ? (
+                                <div className="absolute right-2 top-8 z-10 w-32 overflow-hidden rounded-lg border border-[#dbe1e8] bg-white shadow-[0_12px_32px_rgba(15,23,42,0.12)]">
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="block w-full px-3 py-2 text-left text-[12px] text-[#9aa3af] disabled:cursor-not-allowed"
+                                  >
+                                    Rename
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="block w-full border-t border-[#eef2f6] px-3 py-2 text-left text-[12px] text-[#9aa3af] disabled:cursor-not-allowed"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
                           );
                         })}
                       </div>

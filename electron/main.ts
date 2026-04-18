@@ -58,15 +58,24 @@ async function createDirectoryNode(targetPath: string): Promise<DirectoryNode | 
     const nested = await Promise.all(
       children
         .filter((entry) => !IGNORED_NAMES.has(entry))
-        .sort((left, right) => left.localeCompare(right))
         .map((entry) => createDirectoryNode(path.join(targetPath, entry))),
     );
+
+    const sortedChildren = nested
+      .filter((entry): entry is DirectoryNode | FileNode => Boolean(entry))
+      .sort((left, right) => {
+        if (left.type !== right.type) {
+          return left.type === 'directory' ? -1 : 1;
+        }
+
+        return left.name.localeCompare(right.name);
+      });
 
     return {
       type: 'directory',
       name,
       path: targetPath,
-      children: nested.filter((entry): entry is DirectoryNode | FileNode => Boolean(entry)),
+      children: sortedChildren,
     };
   }
 

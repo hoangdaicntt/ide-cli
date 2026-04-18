@@ -18,23 +18,21 @@ type CodexPanelProps = {
 export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const initialize = useCodexStore((state) => state.initialize);
   const models = useCodexStore((state) => state.models);
-  const modes = useCodexStore((state) => state.modes);
   const connectionStatus = useCodexStore((state) => state.connectionStatus);
   const connectionError = useCodexStore((state) => state.connectionError);
   const projectState = useCodexStore((state) => state.projectStates[projectId]);
   const setDraft = useCodexStore((state) => state.setDraft);
   const setSelectedModel = useCodexStore((state) => state.setSelectedModel);
-  const setSelectedMode = useCodexStore((state) => state.setSelectedMode);
   const setSelectedReasoningEffort = useCodexStore((state) => state.setSelectedReasoningEffort);
   const setSelectedApprovalPolicy = useCodexStore((state) => state.setSelectedApprovalPolicy);
-  const setSelectedSandboxMode = useCodexStore((state) => state.setSelectedSandboxMode);
   const loadProjectThreads = useCodexStore((state) => state.loadProjectThreads);
   const sendPrompt = useCodexStore((state) => state.sendPrompt);
   const interruptTurn = useCodexStore((state) => state.interruptTurn);
   const toggleAttachedFile = useCodexStore((state) => state.toggleAttachedFile);
-  const removeAttachedFile = useCodexStore((state) => state.removeAttachedFile);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [fileQuery, setFileQuery] = useState('');
+  const [highlightedFileIndex, setHighlightedFileIndex] = useState(0);
+  const [mentionRange, setMentionRange] = useState<{ start: number; end: number } | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -59,10 +57,8 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
 
   const selectedModel =
     projectState?.selectedModel ?? models.find((model) => model.isDefault)?.model ?? models[0]?.model ?? '';
-  const selectedMode = projectState?.selectedMode ?? 'default';
   const selectedReasoningEffort = projectState?.selectedReasoningEffort ?? 'medium';
   const selectedApprovalPolicy = projectState?.selectedApprovalPolicy ?? 'on-request';
-  const selectedSandboxMode = projectState?.selectedSandboxMode ?? 'workspace-write';
   const draft = projectState?.draft ?? '';
   const attachedFilePaths = projectState?.attachedFilePaths ?? [];
   const messages = projectState?.messages ?? [];
@@ -92,17 +88,46 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   useEffect(() => {
     if (!pickerOpen) {
       setFileQuery('');
+      setHighlightedFileIndex(0);
+      setMentionRange(null);
     }
   }, [pickerOpen]);
 
-  const replaceMentionDraft = (currentDraft: string, nextValue: string) => {
-    const match = currentDraft.match(/(^|\s)@([^\s@]*)$/);
+  useEffect(() => {
+    setHighlightedFileIndex(0);
+  }, [fileQuery]);
 
-    if (!match || !nextValue) {
+  const replaceMentionDraft = (currentDraft: string, nextValue: string) => {
+    if (!mentionRange || !nextValue) {
       return currentDraft;
     }
 
-    return currentDraft.replace(/(^|\s)@([^\s@]*)$/, '$1').replace(/\s+$/, ' ');
+    const before = currentDraft.slice(0, mentionRange.start);
+    const after = currentDraft.slice(mentionRange.end);
+    const needsLeadingSpace = before.length > 0 && !/\s$/.test(before);
+    const needsTrailingSpace = after.length > 0 && !/^\s/.test(after);
+
+    return `${before}${needsLeadingSpace ? ' ' : ''}${nextValue}${needsTrailingSpace ? ' ' : ''}${after}`;
+  };
+
+  const handleSelectMention = (targetPath?: string) => {
+    const selectedPath = targetPath ?? filteredFiles[highlightedFileIndex]?.path;
+
+    if (!selectedPath) {
+      return;
+    }
+
+    const relativePath = selectedPath.startsWith(rootPath) ? selectedPath.slice(rootPath.length + 1) : selectedPath;
+
+    if (!attachedFilePaths.includes(selectedPath)) {
+      toggleAttachedFile(projectId, selectedPath);
+    }
+
+    setDraft(projectId, replaceMentionDraft(draft, relativePath));
+    setPickerOpen(false);
+    setFileQuery('');
+    setHighlightedFileIndex(0);
+    setMentionRange(null);
   };
 
   return (
@@ -126,16 +151,12 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
 
       <CodexComposer
         draft={draft}
-        attachedFilePaths={attachedFilePaths}
         connectionStatus={connectionStatus}
         isSending={isSending}
         canInterrupt={canInterrupt}
-        modes={modes}
         models={models}
-        selectedMode={selectedMode}
         selectedModel={selectedModel}
         selectedReasoningEffort={selectedReasoningEffort}
-        selectedSandboxMode={selectedSandboxMode}
         selectedApprovalPolicy={selectedApprovalPolicy}
         isMentionActive={pickerOpen}
         onDraftChange={(value) => setDraft(projectId, value)}
@@ -149,34 +170,32 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
         onInterrupt={() => {
           void interruptTurn(projectId);
         }}
-        onTogglePicker={() => setPickerOpen((current) => !current)}
-        onRemoveAttachedFile={(filePath) => removeAttachedFile(projectId, filePath)}
-        onSelectMode={(value) => setSelectedMode(projectId, value)}
         onSelectModel={(value) => setSelectedModel(projectId, value)}
         onSelectReasoningEffort={(value) => setSelectedReasoningEffort(projectId, value)}
-        onSelectSandboxMode={(value) => setSelectedSandboxMode(projectId, value)}
         onSelectApprovalPolicy={(value) => setSelectedApprovalPolicy(projectId, value)}
         onMentionQueryChange={(value) => {
           if (value === null) {
             setPickerOpen(false);
             setFileQuery('');
+            setMentionRange(null);
             return;
           }
 
           setPickerOpen(true);
-          setFileQuery(value);
+          setFileQuery(value.query);
+          setMentionRange({ start: value.start, end: value.end });
         }}
         onMentionSelect={() => {
-          const firstFile = filteredFiles[0];
-
-          if (!firstFile) {
+          handleSelectMention();
+        }}
+        onMoveMentionSelection={(direction) => {
+          if (filteredFiles.length === 0) {
             return;
           }
 
-          toggleAttachedFile(projectId, firstFile.path);
-          setDraft(projectId, replaceMentionDraft(draft, firstFile.path));
-          setPickerOpen(false);
-          setFileQuery('');
+          setHighlightedFileIndex((current) =>
+            direction === 'down' ? (current + 1) % filteredFiles.length : (current - 1 + filteredFiles.length) % filteredFiles.length,
+          );
         }}
       />
 
@@ -184,15 +203,11 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
         <FilePicker
           rootPath={rootPath}
           files={filteredFiles}
-          attachedFilePaths={attachedFilePaths}
           fileQuery={fileQuery}
+          highlightedIndex={highlightedFileIndex}
           onQueryChange={setFileQuery}
-          onToggleFile={(filePath) => {
-            toggleAttachedFile(projectId, filePath);
-            setDraft(projectId, replaceMentionDraft(draft, filePath));
-            setPickerOpen(false);
-            setFileQuery('');
-          }}
+          onSelectFile={(filePath) => handleSelectMention(filePath)}
+          onHighlightFile={setHighlightedFileIndex}
         />
       ) : null}
     </div>

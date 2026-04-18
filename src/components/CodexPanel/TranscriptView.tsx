@@ -20,17 +20,17 @@ export function TranscriptView({
 }) {
   return (
     <div className="mx-auto max-w-3xl">
-      {isLoadingHistory ? <div className="text-sm text-[#7c8591]">Loading thread history...</div> : null}
+      {isLoadingHistory ? <div className="text-[13px] text-[#7c8591]">Loading thread history...</div> : null}
       {transcript.length === 0 ? (
         <div className="px-4 py-8 text-center">
-          <div className="text-sm font-medium text-[#243040]">Start a Codex conversation</div>
-          <p className="mt-2 text-sm leading-6 text-[#677383]">
+          <div className="text-[13px] font-medium text-[#243040]">Start a Codex conversation</div>
+          <p className="mt-2 text-[13px] leading-6 text-[#677383]">
             Select an agent, model, permission policy, attach files if needed, then send your prompt.
           </p>
         </div>
       ) : null}
       {previousMessageCount > 0 ? (
-        <div className="mb-6 flex items-center gap-2 py-1 text-sm text-[#8b9098]">
+        <div className="mb-6 flex items-center gap-2 py-1 text-[13px] text-[#8b9098]">
           <div className="text-[13px]">{previousMessageCount} previous messages</div>
           <div className="text-[18px] leading-none text-[#b4bac3]">›</div>
         </div>

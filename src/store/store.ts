@@ -8,7 +8,7 @@ import type {
   WorkspaceSession,
 } from '../shared/ipc';
 
-type EditorTab = {
+export type EditorTab = {
   path: string;
   name: string;
   content: string;
@@ -35,6 +35,8 @@ type WorkspaceStore = {
   openProject: () => Promise<void>;
   closeProject: (projectId: string) => Promise<void>;
   setActiveProject: (projectId: string) => void;
+  setActiveFile: (projectId: string, filePath: string) => void;
+  closeFile: (projectId: string, filePath: string) => void;
   openFile: (projectId: string, file: FileNode) => Promise<void>;
   updateFileContent: (projectId: string, filePath: string, content: string) => void;
   ensureTerminal: (projectId: string) => Promise<TerminalMeta | null>;
@@ -205,6 +207,52 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
   setActiveProject: (projectId: string) => {
     set({ activeProjectId: projectId });
+  },
+
+  setActiveFile: (projectId, filePath) => {
+    set((state) => {
+      const project = state.projects[projectId];
+
+      if (!project?.openFiles[filePath]) {
+        return state;
+      }
+
+      return {
+        projects: {
+          ...state.projects,
+          [projectId]: {
+            ...project,
+            activeFilePath: filePath,
+          },
+        },
+      };
+    });
+  },
+
+  closeFile: (projectId, filePath) => {
+    set((state) => {
+      const project = state.projects[projectId];
+
+      if (!project?.openFiles[filePath]) {
+        return state;
+      }
+
+      const nextOpenFiles = { ...project.openFiles };
+      delete nextOpenFiles[filePath];
+      const nextPaths = Object.keys(nextOpenFiles);
+
+      return {
+        projects: {
+          ...state.projects,
+          [projectId]: {
+            ...project,
+            openFiles: nextOpenFiles,
+            activeFilePath:
+              project.activeFilePath === filePath ? nextPaths[nextPaths.length - 1] ?? null : project.activeFilePath,
+          },
+        },
+      };
+    });
   },
 
   closeProject: async (projectId: string) => {
@@ -503,4 +551,15 @@ export function flattenFiles(nodes: Array<DirectoryNode | FileNode>): FileNode[]
 
 export function getDisplayNameFromPath(filePath: string): string {
   return getNameFromPath(filePath);
+}
+
+export function getRelativePath(rootPath: string, targetPath: string): string {
+  const normalizedRoot = rootPath.replace(/\\/g, '/');
+  const normalizedTarget = targetPath.replace(/\\/g, '/');
+
+  if (normalizedTarget.startsWith(`${normalizedRoot}/`)) {
+    return normalizedTarget.slice(normalizedRoot.length + 1);
+  }
+
+  return targetPath;
 }

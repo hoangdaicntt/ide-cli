@@ -18,6 +18,16 @@ type TreeNodeProps = {
   onToggle: (path: string) => void;
 };
 
+function sortTreeNodes(nodes: Array<DirectoryNode | FileNode>): Array<DirectoryNode | FileNode> {
+  return [...nodes].sort((left, right) => {
+    if (left.type !== right.type) {
+      return left.type === 'directory' ? -1 : 1;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
+}
+
 function TreeNode({
   projectId,
   node,
@@ -65,7 +75,7 @@ function TreeNode({
 
       {isExpanded && (
         <div className="space-y-1">
-          {node.children.map((child) => (
+          {sortTreeNodes(node.children).map((child) => (
             <TreeNode
               key={child.path}
               projectId={projectId}
@@ -83,7 +93,11 @@ function TreeNode({
 }
 
 export function FileTree({ projectId, nodes, activeFilePath }: FileTreeProps) {
-  const defaultExpanded = useMemo(() => new Set(nodes.map((node) => node.path)), [nodes]);
+  const sortedNodes = useMemo(() => sortTreeNodes(nodes), [nodes]);
+  const defaultExpanded = useMemo(
+    () => new Set(sortedNodes.filter((node) => node.type === 'directory').map((node) => node.path)),
+    [sortedNodes],
+  );
   const [expanded, setExpanded] = useState<Set<string>>(defaultExpanded);
 
   const toggle = (targetPath: string) => {
@@ -106,7 +120,7 @@ export function FileTree({ projectId, nodes, activeFilePath }: FileTreeProps) {
         Files
       </div>
       <div className="space-y-1">
-        {nodes.map((node) => (
+        {sortedNodes.map((node) => (
           <TreeNode
             key={node.path}
             projectId={projectId}

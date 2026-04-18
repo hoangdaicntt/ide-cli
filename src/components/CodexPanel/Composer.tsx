@@ -1,74 +1,44 @@
-import { getDisplayNameFromPath } from '../../store/store';
-import type {
-  CodexApprovalPolicy,
-  CodexMode,
-  CodexModel,
-  CodexReasoningEffort,
-  CodexSandboxMode,
-} from '../../shared/codex';
 import { useEffect, useMemo, useRef } from 'react';
-
-function toneButtonClass(isActive: boolean): string {
-  return [
-    'rounded-full border px-3 py-1.5 text-[12px] font-medium transition',
-    isActive
-      ? 'border-[#c8d9fb] bg-[#d9e8ff] text-[#2a5e9c]'
-      : 'border-[#dfe5ee] bg-white text-[#6c7683] hover:border-[#cfd7e3] hover:text-[#2a313c]',
-  ].join(' ');
-}
+import type { CodexApprovalPolicy, CodexModel, CodexReasoningEffort } from '../../shared/codex';
 
 export function CodexComposer({
   draft,
-  attachedFilePaths,
   connectionStatus,
   isSending,
   canInterrupt,
-  modes,
   models,
-  selectedMode,
   selectedModel,
   selectedReasoningEffort,
-  selectedSandboxMode,
   selectedApprovalPolicy,
   isMentionActive,
   onDraftChange,
   onSubmit,
   onInterrupt,
-  onTogglePicker,
-  onRemoveAttachedFile,
-  onSelectMode,
   onSelectModel,
   onSelectReasoningEffort,
-  onSelectSandboxMode,
   onSelectApprovalPolicy,
   onMentionQueryChange,
   onMentionSelect,
+  onMoveMentionSelection,
 }: {
   draft: string;
-  attachedFilePaths: string[];
   connectionStatus: string;
   isSending: boolean;
   canInterrupt: boolean;
-  modes: CodexMode[];
   models: CodexModel[];
-  selectedMode: string;
   selectedModel: string;
   selectedReasoningEffort: CodexReasoningEffort | null;
-  selectedSandboxMode: CodexSandboxMode;
   selectedApprovalPolicy: CodexApprovalPolicy;
   isMentionActive: boolean;
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
   onInterrupt: () => void;
-  onTogglePicker: () => void;
-  onRemoveAttachedFile: (filePath: string) => void;
-  onSelectMode: (value: string) => void;
   onSelectModel: (value: string) => void;
   onSelectReasoningEffort: (value: CodexReasoningEffort) => void;
-  onSelectSandboxMode: (value: CodexSandboxMode) => void;
   onSelectApprovalPolicy: (value: CodexApprovalPolicy) => void;
-  onMentionQueryChange: (value: string | null) => void;
+  onMentionQueryChange: (value: { query: string; start: number; end: number } | null) => void;
   onMentionSelect: () => void;
+  onMoveMentionSelection: (direction: 'up' | 'down') => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentModel = useMemo(
@@ -79,7 +49,7 @@ export function CodexComposer({
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = '0px';
-      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 112), 220)}px`;
+      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 96), 220)}px`;
     }
   }, [draft]);
 
@@ -89,30 +59,23 @@ export function CodexComposer({
     const match = beforeCaret.match(/(?:^|\s)@([^\s@]*)$/);
 
     if (match) {
-      onMentionQueryChange(match[1] ?? '');
+      onMentionQueryChange({
+        query: match[1] ?? '',
+        start: safeCaret - match[0].length + match[0].lastIndexOf('@'),
+        end: safeCaret,
+      });
       return;
     }
 
     onMentionQueryChange(null);
   };
 
+  const reasoningOptions =
+    currentModel?.supportedReasoningEfforts.map((item) => item.reasoningEffort) ?? ['minimal', 'low', 'medium', 'high', 'xhigh'];
+
   return (
-    <div className="border-t border-[#eceef2] bg-[#f7f8fa] px-5 py-4">
-      <div className="mx-auto max-w-3xl rounded-[34px] border border-[#dde2ea] bg-white px-4 py-3 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
-        {attachedFilePaths.length > 0 ? (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {attachedFilePaths.map((filePath) => (
-              <button
-                key={filePath}
-                type="button"
-                onClick={() => onRemoveAttachedFile(filePath)}
-                className="rounded-full border border-[#cfdcf0] bg-[#f5f9ff] px-2.5 py-1 text-[11px] font-medium text-[#52739c]"
-              >
-                @{getDisplayNameFromPath(filePath)} ×
-              </button>
-            ))}
-          </div>
-        ) : null}
+    <div className="border-t border-[#eceef2] bg-[#f7f8fa] px-4 py-3">
+      <div className="mx-auto max-w-3xl rounded-[20px] border border-[#dde2ea] bg-white px-4 py-3 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
         <textarea
           ref={textareaRef}
           value={draft}
@@ -133,12 +96,25 @@ export function CodexComposer({
             }
 
             if (event.key === 'Escape' && isMentionActive) {
+              event.preventDefault();
               onMentionQueryChange(null);
             }
 
-            if (event.key === 'Tab' && isMentionActive) {
+            if ((event.key === 'Tab' || event.key === 'Enter') && isMentionActive) {
               event.preventDefault();
               onMentionSelect();
+              return;
+            }
+
+            if (event.key === 'ArrowDown' && isMentionActive) {
+              event.preventDefault();
+              onMoveMentionSelection('down');
+              return;
+            }
+
+            if (event.key === 'ArrowUp' && isMentionActive) {
+              event.preventDefault();
+              onMoveMentionSelection('up');
               return;
             }
 
@@ -148,21 +124,15 @@ export function CodexComposer({
             }
           }}
           placeholder="Ask for follow-up changes"
-          className="min-h-[108px] w-full resize-none bg-white px-1 py-2 text-[15px] leading-7 text-[#2b3038] outline-none placeholder:text-[#b0b5bd]"
+          className="min-h-[96px] w-full resize-none bg-white px-1 py-2 text-[13px] leading-6 text-[#2b3038] outline-none placeholder:text-[#b0b5bd]"
         />
-        <div className="mt-4 border-t border-[#eef2f6] pt-3">
+
+        <div className="mt-3 border-t border-[#eef2f6] pt-3">
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onTogglePicker}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#d7dee8] bg-[#fafbfd] text-[18px] leading-none text-[#576170]"
-            >
-              +
-            </button>
             <select
               value={selectedModel}
               onChange={(event) => onSelectModel(event.target.value)}
-              className="h-10 min-w-[170px] rounded-full border border-[#dce3ec] bg-[#fafbfd] px-4 text-sm text-[#2a3038]"
+              className="h-9 min-w-[170px] rounded-xl border border-[#dce3ec] bg-[#fafbfd] px-3 text-[13px] text-[#2a3038]"
             >
               {models.map((model) => (
                 <option key={model.id} value={model.model}>
@@ -170,102 +140,45 @@ export function CodexComposer({
                 </option>
               ))}
             </select>
-            {currentModel ? (
-              <div className="rounded-full border border-[#dce3ec] bg-[#fafbfd] px-4 py-2 text-[13px] text-[#707987]">
-                {currentModel.supportedReasoningEfforts.length > 0 ? 'Reasoning' : 'Chat'}
-              </div>
-            ) : null}
-            <div className="hidden h-7 w-px bg-[#e6ebf1] sm:block" />
+
+            <select
+              value={selectedReasoningEffort ?? currentModel?.defaultReasoningEffort ?? 'medium'}
+              onChange={(event) => onSelectReasoningEffort(event.target.value as CodexReasoningEffort)}
+              className="h-9 min-w-[120px] rounded-xl border border-[#dce3ec] bg-[#fafbfd] px-3 text-[13px] text-[#2a3038]"
+            >
+              {reasoningOptions.map((effort) => (
+                <option key={effort} value={effort}>
+                  {effort}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedApprovalPolicy}
+              onChange={(event) => onSelectApprovalPolicy(event.target.value as CodexApprovalPolicy)}
+              className="h-9 min-w-[130px] rounded-xl border border-[#dce3ec] bg-[#fafbfd] px-3 text-[13px] text-[#2a3038]"
+            >
+              <option value="on-request">ask</option>
+              <option value="untrusted">untrusted</option>
+              <option value="on-failure">failure</option>
+              <option value="never">never</option>
+            </select>
+
             {canInterrupt ? (
               <button
                 type="button"
                 onClick={onInterrupt}
-                className="rounded-full border border-[#e6c8cc] bg-[#fff7f7] px-3 py-2 text-[12px] font-medium text-[#9a4851]"
+                className="h-9 rounded-xl border border-[#e6c8cc] bg-[#fff7f7] px-3 text-[12px] font-medium text-[#9a4851]"
               >
-                Interrupt
+                Stop
               </button>
             ) : null}
-          </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            {modes.map((mode) => {
-              const value = mode.mode ?? mode.name.toLowerCase();
-
-              return (
-                <button
-                  key={mode.name}
-                  type="button"
-                  onClick={() => onSelectMode(value)}
-                  className={toneButtonClass(selectedMode === value)}
-                >
-                  {mode.name}
-                </button>
-              );
-            })}
-            <div className="hidden h-7 w-px self-center bg-[#e6ebf1] sm:block" />
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-2">
-            {(['minimal', 'low', 'medium', 'high', 'xhigh'] as CodexReasoningEffort[]).map((effort) => (
-              <button
-                key={effort}
-                type="button"
-                onClick={() => onSelectReasoningEffort(effort)}
-                className={toneButtonClass((selectedReasoningEffort ?? 'medium') === effort)}
-              >
-                {effort}
-              </button>
-            ))}
-            <div className="hidden h-7 w-px self-center bg-[#e6ebf1] sm:block" />
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-2">
-            {(
-              [
-                ['workspace-write', 'workspace'],
-                ['read-only', 'read only'],
-                ['danger-full-access', 'full access'],
-              ] as Array<[CodexSandboxMode, string]>
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onSelectSandboxMode(value)}
-                className={toneButtonClass(selectedSandboxMode === value)}
-              >
-                {label}
-              </button>
-            ))}
-            <div className="hidden h-7 w-px self-center bg-[#e6ebf1] sm:block" />
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-2">
-            {(
-              [
-                ['on-request', 'ask'],
-                ['untrusted', 'untrusted'],
-                ['on-failure', 'failure'],
-                ['never', 'never'],
-              ] as Array<[CodexApprovalPolicy, string]>
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onSelectApprovalPolicy(value)}
-                className={toneButtonClass(selectedApprovalPolicy === value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-3 flex items-center justify-end gap-3">
-            <div className="text-xs text-[#8b9098]">{attachedFilePaths.length} tag(s)</div>
             <button
               type="button"
-              disabled={connectionStatus !== 'ready' || isSending}
               onClick={onSubmit}
-              className="rounded-full bg-[#7295f6] px-4 py-2 text-[13px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-55"
+              disabled={connectionStatus !== 'ready' || isSending}
+              className="ml-auto h-9 rounded-xl bg-[#1f78d1] px-4 text-[12px] font-medium text-white transition hover:bg-[#1868b5] disabled:cursor-not-allowed disabled:bg-[#a5bfd8]"
             >
               {isSending ? 'Sending...' : 'Send'}
             </button>

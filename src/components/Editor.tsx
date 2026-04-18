@@ -1,6 +1,7 @@
 import MonacoEditor, { type OnMount } from '@monaco-editor/react';
 import { useMemo } from 'react';
-import { getActiveEditorTab, useWorkspaceStore } from '../store/store';
+import { CloseIcon } from './FileTreeAssetIcons';
+import { getActiveEditorTab, getRelativePath, useWorkspaceStore } from '../store/store';
 
 type EditorProps = {
   projectId: string;
@@ -40,7 +41,10 @@ function getLanguageFromPath(filePath: string): string {
 export function Editor({ projectId }: EditorProps) {
   const project = useWorkspaceStore((state) => state.projects[projectId]);
   const updateFileContent = useWorkspaceStore((state) => state.updateFileContent);
+  const setActiveFile = useWorkspaceStore((state) => state.setActiveFile);
+  const closeFile = useWorkspaceStore((state) => state.closeFile);
   const activeTab = useMemo(() => getActiveEditorTab(project ?? null), [project]);
+  const openTabs = useMemo(() => Object.values(project?.openFiles ?? {}), [project?.openFiles]);
 
   const handleMount: OnMount = (_editor, monaco) => {
     monaco.editor.defineTheme('jetbrains-light', {
@@ -78,13 +82,55 @@ export function Editor({ projectId }: EditorProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
-      <div className="flex h-9 items-center justify-between border-b border-[#d4dae3] bg-[#f7f9fc] px-3">
-        <div className="min-w-0">
-          <div className="truncate text-[12px] font-medium text-[#1f2329]">{activeTab.name}</div>
-          <div className="truncate text-[11px] text-[#7b8594]">{activeTab.path}</div>
+      <div className="border-b border-[#d4dae3] bg-[#f8fafc]">
+        <div className="flex min-w-0 overflow-x-auto px-2 pt-2">
+          {openTabs.map((tab) => {
+            const isActive = tab.path === activeTab.path;
+
+            return (
+              <button
+                key={tab.path}
+                type="button"
+                onClick={() => setActiveFile(projectId, tab.path)}
+                className={[
+                  'group mr-1 flex h-9 min-w-0 max-w-[220px] items-center gap-2 border border-b-0 px-3 text-left text-[12px] transition',
+                  isActive
+                    ? 'border-[#d4dae3] bg-white text-[#1f2329]'
+                    : 'border-transparent bg-[#eef2f7] text-[#5d6674] hover:bg-[#f3f6fa]',
+                ].join(' ')}
+              >
+                <span className="truncate">{tab.name}</span>
+                {tab.isDirty ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#4d9df7]" /> : null}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    closeFile(projectId, tab.path);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      closeFile(projectId, tab.path);
+                    }
+                  }}
+                  className="flex h-4 w-4 shrink-0 items-center justify-center opacity-45 transition hover:opacity-100"
+                >
+                  <CloseIcon className="h-3 w-3" />
+                </span>
+              </button>
+            );
+          })}
         </div>
-        <div className="border border-[#d2d8e1] bg-white px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[#6b7280]">
-          {getLanguageFromPath(activeTab.path)}
+
+        <div className="flex h-8 items-center justify-between border-t border-[#edf1f5] px-3">
+          <div className="truncate text-[11px] text-[#7b8594]">
+            {getRelativePath(project?.rootPath ?? '', activeTab.path)}
+          </div>
+          <div className="border border-[#d2d8e1] bg-white px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[#6b7280]">
+            {getLanguageFromPath(activeTab.path)}
+          </div>
         </div>
       </div>
 

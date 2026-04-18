@@ -27,8 +27,21 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
+}
+
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag,
+button,
+input,
+textarea,
+select {
+  -webkit-app-region: no-drag;
 }
 
 ::-webkit-scrollbar {

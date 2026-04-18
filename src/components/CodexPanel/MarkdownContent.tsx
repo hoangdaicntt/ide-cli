@@ -5,14 +5,14 @@ export function MarkdownContent({ text, tone = 'default' }: { text: string; tone
   const proseTone = tone === 'system' ? 'text-[#7b2d33]' : 'text-[#1f2329]';
 
   return (
-    <div className={['codex-markdown text-[15px] leading-[1.75]', proseTone].join(' ')}>
+    <div className={['codex-markdown text-[13px] leading-[1.7]', proseTone].join(' ')}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           h1: ({ children }) => <h1 className="mt-6 text-[26px] font-semibold tracking-[-0.03em] text-[#20242b]">{children}</h1>,
           h2: ({ children }) => <h2 className="mt-6 text-[22px] font-semibold tracking-[-0.02em] text-[#20242b]">{children}</h2>,
           h3: ({ children }) => <h3 className="mt-5 text-[17px] font-semibold text-[#20242b]">{children}</h3>,
-          p: ({ children }) => <p className="my-3 whitespace-pre-wrap text-[15px] leading-[1.75]">{children}</p>,
+          p: ({ children }) => <p className="my-3 whitespace-pre-wrap text-[13px] leading-[1.7]">{children}</p>,
           ul: ({ children }) => <ul className="my-3 list-disc space-y-1.5 pl-6">{children}</ul>,
           ol: ({ children }) => <ol className="my-3 list-decimal space-y-1.5 pl-6">{children}</ol>,
           li: ({ children }) => <li>{children}</li>,
@@ -62,7 +62,7 @@ export function MarkdownContent({ text, tone = 'default' }: { text: string; tone
 
 export function UserContent({ text }: { text: string }) {
   return (
-    <div className="text-[15px] leading-[1.75] text-[#2a3038]">
+    <div className="text-[13px] leading-[1.7] text-[#2a3038]">
       <p className="whitespace-pre-wrap">{text}</p>
     </div>
   );
