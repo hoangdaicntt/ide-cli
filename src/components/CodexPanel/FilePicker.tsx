@@ -3,31 +3,22 @@ import type { FileNode } from '../../shared/ipc';
 export function FilePicker({
   rootPath,
   files,
-  fileQuery,
   highlightedIndex,
-  onQueryChange,
   onSelectFile,
   onHighlightFile,
 }: {
   rootPath: string;
   files: FileNode[];
-  fileQuery: string;
   highlightedIndex: number;
-  onQueryChange: (value: string) => void;
   onSelectFile: (filePath: string) => void;
   onHighlightFile: (index: number) => void;
 }) {
   return (
-    <div className="absolute inset-x-5 bottom-[154px] z-10 mx-auto max-w-3xl overflow-hidden rounded-[18px] border border-[#dbe1e8] bg-white shadow-[0_18px_48px_rgba(15,23,42,0.12)]">
-      <div className="border-b border-[#e6ebf1] bg-[#fbfcfd] p-3">
-        <input
-          value={fileQuery}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search project files with @ ..."
-          className="h-9 w-full rounded-xl border border-[#d9dee6] bg-white px-3 text-[13px] text-[#1f2329] outline-none placeholder:text-[#99a1ac]"
-        />
+    <div className="absolute inset-x-4 top-4 z-10 overflow-hidden rounded-[16px] border border-[#dbe1e8] bg-white shadow-[0_18px_48px_rgba(15,23,42,0.12)]">
+      <div className="border-b border-[#e6ebf1] bg-[#fbfcfd] px-3 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[#7f8895]">
+        Project files
       </div>
-      <div className="max-h-72 overflow-auto p-2">
+      <div className="max-h-64 overflow-auto p-2">
         {files.length === 0 ? (
           <div className="px-3 py-8 text-center text-[13px] text-[#7c8591]">No matching files.</div>
         ) : null}
@@ -46,7 +37,7 @@ export function FilePicker({
               ].join(' ')}
             >
               <span className="truncate">{file.path.replace(`${rootPath}/`, '')}</span>
-              <span className="text-[11px] uppercase tracking-[0.12em]">enter</span>
+              <span className="text-[11px] uppercase tracking-[0.12em] text-[#8fa0b5]">enter</span>
             </button>
           );
         })}

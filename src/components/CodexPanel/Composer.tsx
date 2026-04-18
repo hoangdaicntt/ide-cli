@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { CodexApprovalPolicy, CodexModel, CodexReasoningEffort } from '../../shared/codex';
+import type { FileNode } from '../../shared/ipc';
+import { FilePicker } from './FilePicker';
 
 export function CodexComposer({
   draft,
@@ -11,6 +13,9 @@ export function CodexComposer({
   selectedReasoningEffort,
   selectedApprovalPolicy,
   isMentionActive,
+  mentionFiles,
+  highlightedMentionIndex,
+  mentionRootPath,
   onDraftChange,
   onSubmit,
   onInterrupt,
@@ -20,6 +25,7 @@ export function CodexComposer({
   onMentionQueryChange,
   onMentionSelect,
   onMoveMentionSelection,
+  onMentionHover,
 }: {
   draft: string;
   connectionStatus: string;
@@ -30,6 +36,9 @@ export function CodexComposer({
   selectedReasoningEffort: CodexReasoningEffort | null;
   selectedApprovalPolicy: CodexApprovalPolicy;
   isMentionActive: boolean;
+  mentionFiles: FileNode[];
+  highlightedMentionIndex: number;
+  mentionRootPath: string;
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
   onInterrupt: () => void;
@@ -39,6 +48,7 @@ export function CodexComposer({
   onMentionQueryChange: (value: { query: string; start: number; end: number } | null) => void;
   onMentionSelect: () => void;
   onMoveMentionSelection: (direction: 'up' | 'down') => void;
+  onMentionHover: (index: number) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const currentModel = useMemo(
@@ -75,7 +85,17 @@ export function CodexComposer({
 
   return (
     <div className="border-t border-[#eceef2] bg-[#f7f8fa] px-4 py-3">
-      <div className="mx-auto max-w-3xl rounded-[20px] border border-[#dde2ea] bg-white px-4 py-3 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
+      <div className="relative mx-auto max-w-3xl rounded-[20px] border border-[#dde2ea] bg-white px-4 py-3 shadow-[0_14px_36px_rgba(15,23,42,0.07)]">
+        {isMentionActive ? (
+          <FilePicker
+            rootPath={mentionRootPath}
+            files={mentionFiles}
+            highlightedIndex={highlightedMentionIndex}
+            onSelectFile={onMentionSelect}
+            onHighlightFile={onMentionHover}
+          />
+        ) : null}
+
         <textarea
           ref={textareaRef}
           value={draft}
@@ -124,7 +144,10 @@ export function CodexComposer({
             }
           }}
           placeholder="Ask for follow-up changes"
-          className="min-h-[96px] w-full resize-none bg-white px-1 py-2 text-[13px] leading-6 text-[#2b3038] outline-none placeholder:text-[#b0b5bd]"
+          className={[
+            'min-h-[96px] w-full resize-none bg-white px-1 py-2 text-[13px] leading-6 text-[#2b3038] outline-none placeholder:text-[#b0b5bd]',
+            isMentionActive ? 'pt-[276px]' : '',
+          ].join(' ')}
         />
 
         <div className="mt-3 border-t border-[#eef2f6] pt-3">

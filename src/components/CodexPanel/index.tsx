@@ -1,10 +1,9 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { DirectoryNode } from '../../shared/ipc';
-import { flattenFiles } from '../../store/store';
+import { flattenFiles, getRelativePath } from '../../store/store';
 import { useCodexStore } from '../../store/codexStore';
 import { ApprovalCard } from './ApprovalCard';
 import { CodexComposer } from './Composer';
-import { FilePicker } from './FilePicker';
 import { CodexHeader } from './Header';
 import { TranscriptView } from './TranscriptView';
 import { buildTranscript } from './types';
@@ -28,7 +27,6 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const loadProjectThreads = useCodexStore((state) => state.loadProjectThreads);
   const sendPrompt = useCodexStore((state) => state.sendPrompt);
   const interruptTurn = useCodexStore((state) => state.interruptTurn);
-  const toggleAttachedFile = useCodexStore((state) => state.toggleAttachedFile);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [fileQuery, setFileQuery] = useState('');
   const [highlightedFileIndex, setHighlightedFileIndex] = useState(0);
@@ -52,15 +50,17 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
       return files;
     }
 
-    return files.filter((file) => file.path.toLowerCase().includes(normalizedQuery));
-  }, [deferredFileQuery, files]);
+    return files.filter((file) => {
+      const relativePath = getRelativePath(rootPath, file.path).toLowerCase();
+      return relativePath.includes(normalizedQuery) || file.name.toLowerCase().includes(normalizedQuery);
+    });
+  }, [deferredFileQuery, files, rootPath]);
 
   const selectedModel =
     projectState?.selectedModel ?? models.find((model) => model.isDefault)?.model ?? models[0]?.model ?? '';
   const selectedReasoningEffort = projectState?.selectedReasoningEffort ?? 'medium';
   const selectedApprovalPolicy = projectState?.selectedApprovalPolicy ?? 'on-request';
   const draft = projectState?.draft ?? '';
-  const attachedFilePaths = projectState?.attachedFilePaths ?? [];
   const messages = projectState?.messages ?? [];
   const pendingRequests = projectState?.pendingRequests ?? [];
   const isLoadingHistory = projectState?.isLoadingHistory ?? false;
@@ -119,10 +119,6 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
 
     const relativePath = selectedPath.startsWith(rootPath) ? selectedPath.slice(rootPath.length + 1) : selectedPath;
 
-    if (!attachedFilePaths.includes(selectedPath)) {
-      toggleAttachedFile(projectId, selectedPath);
-    }
-
     setDraft(projectId, replaceMentionDraft(draft, relativePath));
     setPickerOpen(false);
     setFileQuery('');
@@ -159,6 +155,9 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
         selectedReasoningEffort={selectedReasoningEffort}
         selectedApprovalPolicy={selectedApprovalPolicy}
         isMentionActive={pickerOpen}
+        mentionFiles={filteredFiles}
+        highlightedMentionIndex={highlightedFileIndex}
+        mentionRootPath={rootPath}
         onDraftChange={(value) => setDraft(projectId, value)}
         onSubmit={() => {
           void sendPrompt({
@@ -197,19 +196,8 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
             direction === 'down' ? (current + 1) % filteredFiles.length : (current - 1 + filteredFiles.length) % filteredFiles.length,
           );
         }}
+        onMentionHover={setHighlightedFileIndex}
       />
-
-      {pickerOpen ? (
-        <FilePicker
-          rootPath={rootPath}
-          files={filteredFiles}
-          fileQuery={fileQuery}
-          highlightedIndex={highlightedFileIndex}
-          onQueryChange={setFileQuery}
-          onSelectFile={(filePath) => handleSelectMention(filePath)}
-          onHighlightFile={setHighlightedFileIndex}
-        />
-      ) : null}
     </div>
   );
 }
