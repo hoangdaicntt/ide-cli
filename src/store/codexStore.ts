@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { DirectoryNode, FileNode } from '../shared/ipc';
 import type {
   CodexApprovalPolicy,
   CodexConnectionStatus,
@@ -132,7 +133,7 @@ type CodexStore = {
   loadProjectThreads: (input: { projectId: string; rootPath: string }) => Promise<void>;
   selectThread: (input: { projectId: string; threadId: string }) => Promise<void>;
   newChat: (projectId: string) => void;
-  sendPrompt: (input: { projectId: string; rootPath: string; prompt: string }) => Promise<void>;
+  sendPrompt: (input: { projectId: string; rootPath: string; tree: DirectoryNode[]; prompt: string }) => Promise<void>;
   interruptTurn: (projectId: string) => Promise<void>;
   resolvePendingRequest: (input: {
     projectId: string;
@@ -226,6 +227,84 @@ function upsertMessage(messages: CodexChatMessage[], nextMessage: CodexChatMessa
 
 function getDefaultModel(models: CodexModel[]): string | null {
   return models.find((model) => model.isDefault)?.model ?? models[0]?.model ?? null;
+}
+
+function getRelativeAttachmentLabel(rootPath: string, targetPath: string): string {
+  const normalizedRoot = rootPath.replace(/\\/g, '/');
+  const normalizedTarget = targetPath.replace(/\\/g, '/');
+
+  if (normalizedTarget === normalizedRoot) {
+    const segments = normalizedTarget.split('/').filter(Boolean);
+    return segments[segments.length - 1] ?? targetPath;
+  }
+
+  if (normalizedTarget.startsWith(`${normalizedRoot}/`)) {
+    return normalizedTarget.slice(normalizedRoot.length + 1);
+  }
+
+  return targetPath;
+}
+
+function findTreeNodeByPath(nodes: Array<DirectoryNode | FileNode>, targetPath: string): DirectoryNode | FileNode | null {
+  for (const node of nodes) {
+    if (node.path === targetPath) {
+      return node;
+    }
+
+    if (node.type === 'directory') {
+      const match = findTreeNodeByPath(node.children, targetPath);
+
+      if (match) {
+        return match;
+      }
+    }
+  }
+
+  return null;
+}
+
+function collectFilesFromNode(node: DirectoryNode | FileNode): FileNode[] {
+  if (node.type === 'file') {
+    return [node];
+  }
+
+  return node.children.flatMap((child) => collectFilesFromNode(child));
+}
+
+function resolveAttachedFiles(
+  tree: DirectoryNode[],
+  attachedPaths: string[],
+  rootPath: string,
+): Array<{ filePath: string; relativeLabel: string }> {
+  const resolved: Array<{ filePath: string; relativeLabel: string }> = [];
+  const seen = new Set<string>();
+
+  const appendFile = (filePath: string) => {
+    if (seen.has(filePath)) {
+      return;
+    }
+
+    seen.add(filePath);
+    resolved.push({
+      filePath,
+      relativeLabel: getRelativeAttachmentLabel(rootPath, filePath),
+    });
+  };
+
+  for (const attachedPath of attachedPaths) {
+    const match = findTreeNodeByPath(tree, attachedPath);
+
+    if (!match) {
+      appendFile(attachedPath);
+      continue;
+    }
+
+    for (const file of collectFilesFromNode(match)) {
+      appendFile(file.path);
+    }
+  }
+
+  return resolved;
 }
 
 function sortThreadSummaries(threads: CodexThread[]): CodexThread[] {
@@ -805,7 +884,7 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
     }));
   },
 
-  sendPrompt: async ({ projectId, rootPath, prompt }) => {
+  sendPrompt: async ({ projectId, rootPath, tree, prompt }) => {
     await get().initialize();
 
     const projectState = ensureProjectState(get(), projectId);
@@ -852,10 +931,10 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
         resumedThreadIds.add(threadId);
       }
 
+      const resolvedAttachments = resolveAttachedFiles(tree, projectState.attachedFilePaths, rootPath);
       const fileInputs = await Promise.all(
-        projectState.attachedFilePaths.map(async (filePath) => {
+        resolvedAttachments.map(async ({ filePath, relativeLabel }) => {
           const content = await window.electronAPI.readFile(filePath);
-          const relativeLabel = filePath.startsWith(rootPath) ? filePath.slice(rootPath.length + 1) : filePath;
 
           return {
             type: 'text' as const,

@@ -21,6 +21,14 @@ function EmptyState() {
   );
 }
 
+function AppHeader() {
+  return (
+    <header className="app-drag-region flex h-[50px] w-full items-center border-b border-[var(--shell-border)] bg-[var(--panel-muted-bg)] px-4 pl-[84px]">
+      <div className="text-[13px] font-semibold uppercase tracking-[0.08em] text-[var(--shell-text)]">IDE CLI</div>
+    </header>
+  );
+}
+
 export default function App() {
   const projectIds = useWorkspaceStore((state) => state.projectIds);
   const projects = useWorkspaceStore((state) => state.projects);
@@ -64,6 +72,7 @@ export default function App() {
   return (
     <div className="h-screen overflow-hidden bg-[var(--shell-canvas)] text-[var(--shell-text)]">
       <div className="flex h-full flex-col overflow-hidden">
+        <AppHeader />
         <div className="min-h-0 flex-1 overflow-hidden">
           {projectIds.length === 0 ? (
             <EmptyState />

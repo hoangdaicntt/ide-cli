@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { AlertCircle, ArrowUp, ChevronDown, Plus } from 'lucide-react';
 import type { CodexApprovalPolicy, CodexModel, CodexReasoningEffort } from '../../shared/codex';
-import type { FileNode } from '../../shared/ipc';
-import { TreeAssetIcon } from '../FileTreeAssetIcons';
+import type { ContextPickerItem } from './FilePicker';
 import { FilePicker } from './FilePicker';
+import { TreeAssetIcon } from '../FileTreeAssetIcons';
+
+function formatOptionLabel(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+function trimLeadingMentionMarker(value: string): string {
+  return value.replace(/^@+/, '');
+}
 
 export function CodexComposer({
   draft,
@@ -14,11 +22,10 @@ export function CodexComposer({
   selectedModel,
   selectedReasoningEffort,
   selectedApprovalPolicy,
-  attachedFiles,
+  attachedItems,
   isMentionActive,
-  mentionFiles,
+  mentionItems,
   highlightedMentionIndex,
-  mentionRootPath,
   onDraftChange,
   onSubmit,
   onInterrupt,
@@ -39,11 +46,10 @@ export function CodexComposer({
   selectedModel: string;
   selectedReasoningEffort: CodexReasoningEffort | null;
   selectedApprovalPolicy: CodexApprovalPolicy;
-  attachedFiles: Array<{ path: string; name: string; relativePath: string }>;
+  attachedItems: ContextPickerItem[];
   isMentionActive: boolean;
-  mentionFiles: FileNode[];
+  mentionItems: ContextPickerItem[];
   highlightedMentionIndex: number;
-  mentionRootPath: string;
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
   onInterrupt: () => void;
@@ -52,7 +58,7 @@ export function CodexComposer({
   onSelectApprovalPolicy: (value: CodexApprovalPolicy) => void;
   onRemoveAttachment: (filePath: string) => void;
   onMentionQueryChange: (value: { query: string; start: number; end: number } | null) => void;
-  onMentionSelect: () => void;
+  onMentionSelect: (itemPath?: string) => void;
   onMoveMentionSelection: (direction: 'up' | 'down') => void;
   onMentionHover: (index: number) => void;
 }) {
@@ -62,11 +68,19 @@ export function CodexComposer({
     [models, selectedModel],
   );
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '0px';
-      textareaRef.current.style.height = `${Math.min(Math.max(textareaRef.current.scrollHeight, 86), 220)}px`;
+  const adjustTextareaHeight = () => {
+    if (!textareaRef.current) {
+      return;
     }
+
+    textareaRef.current.style.height = 'auto';
+    const nextHeight = Math.min(Math.max(textareaRef.current.scrollHeight, 86), 220);
+    textareaRef.current.style.height = `${nextHeight}px`;
+    textareaRef.current.style.overflowY = textareaRef.current.scrollHeight > 220 ? 'auto' : 'hidden';
+  };
+
+  useLayoutEffect(() => {
+    adjustTextareaHeight();
   }, [draft]);
 
   const updateMentionState = (value: string, caretPosition: number | null | undefined) => {
@@ -76,7 +90,7 @@ export function CodexComposer({
 
     if (match) {
       onMentionQueryChange({
-        query: match[1] ?? '',
+        query: trimLeadingMentionMarker(match[1] ?? ''),
         start: safeCaret - match[0].length + match[0].lastIndexOf('@'),
         end: safeCaret,
       });
@@ -88,45 +102,49 @@ export function CodexComposer({
 
   const reasoningOptions =
     currentModel?.supportedReasoningEfforts.map((item) => item.reasoningEffort) ?? ['minimal', 'low', 'medium', 'high', 'xhigh'];
+  const showFloatingPanel = isMentionActive || attachedItems.length > 0;
 
   return (
     <div className="border-t border-[var(--shell-border)] bg-[var(--panel-bg)] px-4 py-3">
-      <div className="relative flex flex-col gap-2">
-        {attachedFiles.length > 0 ? (
-          <div className="overflow-hidden rounded-[14px] border border-[var(--shell-border)] bg-white shadow-[var(--shell-shadow)]">
-            <div className="max-h-44 overflow-auto py-2 custom-scrollbar">
-              {attachedFiles.map((file) => (
-                <div
-                  key={file.path}
-                  className="group flex items-center gap-2 px-3 py-1.5 text-[13px] text-[var(--shell-text)] transition hover:bg-[#f5f5f5]"
-                >
-                  <TreeAssetIcon fileName={file.name} className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate font-medium text-[var(--shell-muted)]">{file.name}</span>
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--shell-subtle)]">{file.relativePath}</span>
-                  <button
-                    type="button"
-                    onClick={() => onRemoveAttachment(file.path)}
-                    className="text-[11px] text-[var(--shell-subtle)] opacity-0 transition hover:text-[var(--shell-text)] group-hover:opacity-100"
-                  >
-                    Remove
-                  </button>
+      <div className="relative">
+        {showFloatingPanel ? (
+          <div className="pointer-events-auto absolute inset-x-2 bottom-[calc(100%-1px)] z-10 overflow-hidden rounded-t-[18px] border border-[var(--shell-border-strong)] border-b-0 bg-white shadow-[var(--shell-shadow)] transition-all duration-150">
+            {isMentionActive ? (
+              <FilePicker
+                items={mentionItems}
+                highlightedIndex={highlightedMentionIndex}
+                onSelectItem={onMentionSelect}
+                onHighlightItem={onMentionHover}
+              />
+            ) : (
+              <div className="flex max-h-44 flex-col">
+                <div className="border-b border-[var(--shell-border)] bg-[#fbfcfd] px-3 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--shell-muted)]">
+                  Selected context
                 </div>
-              ))}
-            </div>
+                <div className="overflow-auto px-2 py-1.5 custom-scrollbar">
+                  {attachedItems.map((item) => (
+                    <div
+                      key={item.path}
+                      className="group mb-1 flex items-center gap-2 rounded-xl px-3 py-1.5 text-[13px] text-[var(--shell-text)] transition hover:bg-[#f5f5f5]"
+                    >
+                      <TreeAssetIcon fileName={item.name} isFolder={item.type === 'directory'} className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0 truncate text-[var(--shell-muted)]">{item.relativePath}</span>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveAttachment(item.path)}
+                        className="ml-auto shrink-0 text-[11px] text-[var(--shell-subtle)] opacity-0 transition hover:text-[var(--shell-text)] group-hover:opacity-100"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
 
         <div className="relative rounded-[18px] border border-[var(--shell-border-strong)] bg-white px-3 py-3 shadow-[var(--shell-shadow)]">
-          {isMentionActive ? (
-            <FilePicker
-              rootPath={mentionRootPath}
-              files={mentionFiles}
-              highlightedIndex={highlightedMentionIndex}
-              onSelectFile={onMentionSelect}
-              onHighlightFile={onMentionHover}
-            />
-          ) : null}
-
           <textarea
             ref={textareaRef}
             value={draft}
@@ -175,10 +193,7 @@ export function CodexComposer({
               }
             }}
             placeholder="Type a prompt or @mention files"
-            className={[
-              'min-h-[86px] w-full resize-none bg-transparent px-1 py-1 text-[15px] leading-6 text-[var(--shell-text)] outline-none placeholder:text-[#a8a8a8]',
-              isMentionActive ? 'pt-[276px]' : '',
-            ].join(' ')}
+            className="min-h-[86px] w-full resize-none bg-transparent px-1 py-1 text-[15px] leading-6 text-[var(--shell-text)] outline-none placeholder:text-[#a8a8a8]"
           />
 
           <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--shell-border)] px-1 pt-3">
@@ -231,7 +246,7 @@ export function CodexComposer({
                 >
                   {reasoningOptions.map((effort) => (
                     <option key={effort} value={effort}>
-                      {effort}
+                      {formatOptionLabel(effort)}
                     </option>
                   ))}
                 </select>
