@@ -20,6 +20,7 @@ import { applyMentionMarkdown } from '../components/CodexPanel/MentionText';
 export type CodexChatMessage =
   | {
       id: string;
+      createdAt?: number;
       kind: 'user';
       text: string;
       attachments: string[];
@@ -27,6 +28,7 @@ export type CodexChatMessage =
     }
   | {
       id: string;
+      createdAt?: number;
       kind: 'agent';
       itemId: string;
       turnId: string | null;
@@ -35,6 +37,7 @@ export type CodexChatMessage =
     }
   | {
       id: string;
+      createdAt?: number;
       kind: 'reasoning';
       itemId: string;
       turnId: string | null;
@@ -43,6 +46,7 @@ export type CodexChatMessage =
     }
   | {
       id: string;
+      createdAt?: number;
       kind: 'command';
       itemId: string;
       turnId: string | null;
@@ -53,6 +57,7 @@ export type CodexChatMessage =
     }
   | {
       id: string;
+      createdAt?: number;
       kind: 'fileChange';
       itemId: string;
       turnId: string | null;
@@ -65,6 +70,7 @@ export type CodexChatMessage =
     }
   | {
       id: string;
+      createdAt?: number;
       kind: 'system';
       text: string;
       tone: 'info' | 'error';
@@ -212,9 +218,14 @@ function getProjectIdByThreadId(state: CodexStore, threadId: string): string | n
 
 function upsertMessage(messages: CodexChatMessage[], nextMessage: CodexChatMessage): CodexChatMessage[] {
   const existingIndex = messages.findIndex((message) => message.id === nextMessage.id);
+  const createdAt = nextMessage.createdAt ?? (existingIndex >= 0 ? messages[existingIndex]?.createdAt : undefined) ?? Date.now();
+  const normalizedMessage = {
+    ...nextMessage,
+    createdAt,
+  } satisfies CodexChatMessage;
 
   if (existingIndex === -1) {
-    return [...messages, nextMessage];
+    return [...messages, normalizedMessage];
   }
 
   return messages.map((message, index) => {

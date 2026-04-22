@@ -7,6 +7,7 @@ export type TranscriptEntry = {
   text: string;
   attachments: string[];
   turnId?: string | null;
+  createdAt?: number;
 };
 
 export function formatAssistantFragment(message: CodexChatMessage): string {
@@ -16,16 +17,13 @@ export function formatAssistantFragment(message: CodexChatMessage): string {
     case 'command':
       {
         const commandText = message.command.filter(Boolean).join(' ').trim() || '[command unavailable]';
+        const sections = [`$ ${commandText}`];
 
-      return [
-        'Ran command:',
-        '```sh',
-        commandText,
-        '```',
-        message.output ? ['Output:', '```text', message.output, '```'].join('\n') : '',
-      ]
-        .filter(Boolean)
-        .join('\n\n');
+        if (message.output) {
+          sections.push('', '# Output', message.output);
+        }
+
+        return ['```sh', ...sections, '```'].join('\n');
       }
     case 'fileChange':
       return [
@@ -57,6 +55,7 @@ export function buildTranscript(messages: CodexChatMessage[]): TranscriptEntry[]
         text: message.text || fallbackText,
         attachments: message.attachments,
         turnId: message.turnId,
+        createdAt: message.createdAt,
       });
       continue;
     }
@@ -86,6 +85,7 @@ export function buildTranscript(messages: CodexChatMessage[]): TranscriptEntry[]
       transcript[targetIndex] = {
         ...transcript[targetIndex],
         text: `${transcript[targetIndex].text}\n\n${fragment}`.trim(),
+        createdAt: transcript[targetIndex].createdAt ?? message.createdAt,
       };
       continue;
     }
@@ -94,6 +94,7 @@ export function buildTranscript(messages: CodexChatMessage[]): TranscriptEntry[]
 
     if (!candidateTurnId && last && last.role === role) {
       last.text = `${last.text}\n\n${fragment}`.trim();
+      last.createdAt = last.createdAt ?? message.createdAt;
       continue;
     }
 
@@ -103,6 +104,7 @@ export function buildTranscript(messages: CodexChatMessage[]): TranscriptEntry[]
       text: fragment,
       attachments: [],
       turnId: candidateTurnId,
+      createdAt: message.createdAt,
     });
   }
 

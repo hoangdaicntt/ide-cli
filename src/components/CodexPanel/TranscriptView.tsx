@@ -1,7 +1,69 @@
-import { AlertCircle, Sparkles, UserRound } from 'lucide-react';
-import type { ComponentType } from 'react';
+import { Check, Copy } from 'lucide-react';
+import { useState, type ComponentType } from 'react';
 import { MarkdownContent, UserContent } from './MarkdownContent';
 import type { TranscriptEntry } from './types';
+
+function formatMessageTimestamp(timestamp?: number) {
+  return new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(timestamp ?? Date.now());
+}
+
+function MessageCopyButton({
+  text,
+  variant,
+}: {
+  text: string;
+  variant: 'inline' | 'footer';
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (variant === 'inline') {
+    return (
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1200);
+          } catch {
+            setCopied(false);
+          }
+        }}
+        className="inline-flex shrink-0 items-center justify-center self-end text-[1em] leading-none text-[var(--shell-muted)] transition hover:text-[var(--shell-text)]"
+        aria-label={copied ? 'Copied message' : 'Copy message'}
+        title={copied ? 'Copied' : 'Copy message'}
+      >
+        {copied ? <Check className="h-[1em] w-[1em]" strokeWidth={2.2} /> : <Copy className="h-[1em] w-[1em]" strokeWidth={2.1} />}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1200);
+        } catch {
+          setCopied(false);
+        }
+      }}
+      className="inline-flex items-center text-[12px] leading-none text-[var(--shell-muted)] transition hover:text-[var(--shell-text)]"
+      aria-label={copied ? 'Copied message' : 'Copy message'}
+      title={copied ? 'Copied' : 'Copy message'}
+    >
+      {copied ? <Check className="h-[1em] w-[1em]" strokeWidth={2.2} /> : <Copy className="h-[1em] w-[1em]" strokeWidth={2.1} />}
+    </button>
+  );
+}
 
 export function TranscriptView({
   transcript,
@@ -36,30 +98,36 @@ export function TranscriptView({
         </div>
       ) : null}
       {transcript.map((entry, index) => {
-        const roleTone =
+        const timestampLabel = entry.role === 'user' ? null : formatMessageTimestamp(entry.createdAt);
+        const containerClass =
           entry.role === 'user'
-            ? 'bg-[var(--shell-accent)] text-white'
+            ? 'rounded-2xl bg-[#f1f3f5] px-4 py-3.5'
             : entry.role === 'system'
-              ? 'bg-[#fff2f2] text-[#b03447]'
-              : 'bg-[#e5e5e5] text-[var(--shell-accent)]';
-        const AvatarIcon = entry.role === 'user' ? UserRound : entry.role === 'system' ? AlertCircle : Sparkles;
+              ? 'rounded-2xl border border-[#f3d5d9] bg-[#fff6f7] px-4 py-3.5'
+              : 'py-3.5';
+        const wrapperClass = 'px-4';
 
         return (
           <section key={entry.id} className={index === 0 ? 'pb-4' : 'py-2'}>
-            <div className="flex gap-3 px-4">
-              <div
-                className={[
-                  'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded',
-                  roleTone,
-                ].join(' ')}
-              >
-                <AvatarIcon className="h-3.5 w-3.5" strokeWidth={2.1} />
-              </div>
-              <div className="min-w-0 flex-1 pt-0.5">
+            <div className={wrapperClass}>
+              <div className={containerClass}>
                 {entry.role === 'user' ? (
-                  <UserContent text={entry.text} />
+                  <div className="flex items-start gap-1.5 text-[13px] leading-[1.7]">
+                    <div className="min-w-0 flex-1">
+                      <UserContent text={entry.text} />
+                    </div>
+                    <MessageCopyButton text={entry.text} variant="inline" />
+                  </div>
                 ) : (
-                  <MarkdownContent text={entry.text} tone={entry.role === 'system' ? 'system' : 'default'} />
+                  <>
+                    <div className="min-w-0">
+                      <MarkdownContent text={entry.text} tone={entry.role === 'system' ? 'system' : 'default'} />
+                    </div>
+                    <div className="mt-3 flex items-center gap-3 text-[12px] text-[var(--shell-subtle)]">
+                      <MessageCopyButton text={entry.text} variant="footer" />
+                      <div>{timestampLabel ?? ''}</div>
+                    </div>
+                  </>
                 )}
               </div>
             </div>
