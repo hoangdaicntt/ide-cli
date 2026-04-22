@@ -1,6 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { DirectoryNode, FileNode } from '../../shared/ipc';
-import { getDisplayNameFromPath, getRelativePath } from '../../store/store';
 import { useCodexStore } from '../../store/codexStore';
 import { ApprovalCard } from './ApprovalCard';
 import { CodexComposer } from './Composer';
@@ -67,7 +66,6 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const setSelectedReasoningEffort = useCodexStore((state) => state.setSelectedReasoningEffort);
   const setSelectedApprovalPolicy = useCodexStore((state) => state.setSelectedApprovalPolicy);
   const toggleAttachedFile = useCodexStore((state) => state.toggleAttachedFile);
-  const removeAttachedFile = useCodexStore((state) => state.removeAttachedFile);
   const loadProjectThreads = useCodexStore((state) => state.loadProjectThreads);
   const sendPrompt = useCodexStore((state) => state.sendPrompt);
   const interruptTurn = useCodexStore((state) => state.interruptTurn);
@@ -75,6 +73,7 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const [fileQuery, setFileQuery] = useState('');
   const [highlightedFileIndex, setHighlightedFileIndex] = useState(0);
   const [mentionRange, setMentionRange] = useState<{ start: number; end: number } | null>(null);
+  const [pendingCaretPosition, setPendingCaretPosition] = useState<number | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -113,21 +112,6 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
   const canInterrupt = Boolean(projectState?.threadId && projectState?.activeTurnId);
   const transcript = useMemo(() => buildTranscript(messages), [messages]);
   const previousMessageCount = Math.max(transcript.length - 1, 0);
-  const attachedItems = useMemo(
-    () =>
-      attachedFilePaths.map((targetPath) => {
-        const fallback: ContextPickerItem = {
-          type: 'file',
-          path: targetPath,
-          name: getDisplayNameFromPath(targetPath),
-          relativePath: getRelativePath(rootPath, targetPath),
-        };
-
-        return contextItemByPath.get(targetPath) ?? fallback;
-      }),
-    [attachedFilePaths, contextItemByPath, rootPath],
-  );
-
   useEffect(() => {
     if (!projectState?.selectedModel && selectedModel) {
       setSelectedModel(projectId, selectedModel);
@@ -158,7 +142,10 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
 
   const replaceMentionDraft = (currentDraft: string, nextValue: string) => {
     if (!mentionRange || !nextValue) {
-      return currentDraft;
+      return {
+        value: currentDraft,
+        caretPosition: null,
+      };
     }
 
     let replaceStart = mentionRange.start;
@@ -176,9 +163,14 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
     const after = currentDraft.slice(replaceEnd);
     const normalizedValue = nextValue.replace(/^@+/, '');
     const needsLeadingSpace = before.length > 0 && !/\s$/.test(before);
-    const needsTrailingSpace = after.length > 0 && !/^\s/.test(after);
+    const insertedPrefix = `${before}${needsLeadingSpace ? ' ' : ''}`;
+    const insertedValue = `${normalizedValue} `;
+    const nextAfter = after.replace(/^\s*/, '');
 
-    return `${before}${needsLeadingSpace ? ' ' : ''}${normalizedValue}${needsTrailingSpace ? ' ' : ''}${after}`;
+    return {
+      value: `${insertedPrefix}${insertedValue}${nextAfter}`,
+      caretPosition: insertedPrefix.length + insertedValue.length,
+    };
   };
 
   const handleSelectMention = (targetPath?: string) => {
@@ -194,12 +186,11 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
       toggleAttachedFile(projectId, selectedItem.path);
     }
 
-    const mentionLabel =
-      selectedItem.type === 'directory' && !selectedItem.relativePath.endsWith('/')
-        ? `${selectedItem.relativePath}/`
-        : selectedItem.relativePath;
+    const mentionLabel = selectedItem.name;
+    const nextDraft = replaceMentionDraft(draft, mentionLabel);
 
-    setDraft(projectId, replaceMentionDraft(draft, mentionLabel));
+    setDraft(projectId, nextDraft.value);
+    setPendingCaretPosition(nextDraft.caretPosition);
     setPickerOpen(false);
     setFileQuery('');
     setHighlightedFileIndex(0);
@@ -234,10 +225,11 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
         selectedModel={selectedModel}
         selectedReasoningEffort={selectedReasoningEffort}
         selectedApprovalPolicy={selectedApprovalPolicy}
-        attachedItems={attachedItems}
         isMentionActive={pickerOpen}
         mentionItems={filteredItems}
         highlightedMentionIndex={highlightedFileIndex}
+        pendingCaretPosition={pendingCaretPosition}
+        onPendingCaretApplied={() => setPendingCaretPosition(null)}
         onDraftChange={(value) => setDraft(projectId, value)}
         onSubmit={() => {
           void sendPrompt({
@@ -253,7 +245,6 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
         onSelectModel={(value) => setSelectedModel(projectId, value)}
         onSelectReasoningEffort={(value) => setSelectedReasoningEffort(projectId, value)}
         onSelectApprovalPolicy={(value) => setSelectedApprovalPolicy(projectId, value)}
-        onRemoveAttachment={(filePath) => removeAttachedFile(projectId, filePath)}
         onMentionQueryChange={(value) => {
           if (value === null) {
             setPickerOpen(false);

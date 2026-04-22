@@ -1,4 +1,5 @@
 import type { CodexChatMessage, PendingCodexRequest } from '../../store/codexStore';
+import { buildMentionMarkdownFromPaths } from './MentionText';
 
 export type TranscriptEntry = {
   id: string;
@@ -45,10 +46,11 @@ export function buildTranscript(messages: CodexChatMessage[]): TranscriptEntry[]
 
   for (const message of messages) {
     if (message.kind === 'user') {
+      const fallbackText = message.attachments.length > 0 ? buildMentionMarkdownFromPaths(message.attachments) : 'Attached files only.';
       transcript.push({
         id: message.id,
         role: 'user',
-        text: message.text || 'Attached files only.',
+        text: message.text || fallbackText,
         attachments: message.attachments,
         turnId: message.turnId,
       });

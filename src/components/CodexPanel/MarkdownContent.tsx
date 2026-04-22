@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { MentionText } from './MentionText';
 
 function CodeBlock({ language, code }: { language: string; code: string }) {
   const [copied, setCopied] = useState(false);
@@ -82,7 +83,9 @@ export function MarkdownContent({ text, tone = 'default' }: { text: string; tone
 export function UserContent({ text }: { text: string }) {
   return (
     <div className="text-[13px] leading-[1.7] text-[var(--shell-text)]">
-      <p className="whitespace-pre-wrap">{text}</p>
+      <p className="whitespace-pre-wrap break-words">
+        <MentionText text={text} />
+      </p>
     </div>
   );
 }

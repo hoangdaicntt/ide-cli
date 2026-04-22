@@ -3,7 +3,6 @@ import { AlertCircle, ArrowUp, ChevronDown, Plus } from 'lucide-react';
 import type { CodexApprovalPolicy, CodexModel, CodexReasoningEffort } from '../../shared/codex';
 import type { ContextPickerItem } from './FilePicker';
 import { FilePicker } from './FilePicker';
-import { TreeAssetIcon } from '../FileTreeAssetIcons';
 
 function formatOptionLabel(value: string): string {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
@@ -22,17 +21,17 @@ export function CodexComposer({
   selectedModel,
   selectedReasoningEffort,
   selectedApprovalPolicy,
-  attachedItems,
   isMentionActive,
   mentionItems,
   highlightedMentionIndex,
+  pendingCaretPosition,
+  onPendingCaretApplied,
   onDraftChange,
   onSubmit,
   onInterrupt,
   onSelectModel,
   onSelectReasoningEffort,
   onSelectApprovalPolicy,
-  onRemoveAttachment,
   onMentionQueryChange,
   onMentionSelect,
   onMoveMentionSelection,
@@ -46,17 +45,17 @@ export function CodexComposer({
   selectedModel: string;
   selectedReasoningEffort: CodexReasoningEffort | null;
   selectedApprovalPolicy: CodexApprovalPolicy;
-  attachedItems: ContextPickerItem[];
   isMentionActive: boolean;
   mentionItems: ContextPickerItem[];
   highlightedMentionIndex: number;
+  pendingCaretPosition: number | null;
+  onPendingCaretApplied: () => void;
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
   onInterrupt: () => void;
   onSelectModel: (value: string) => void;
   onSelectReasoningEffort: (value: CodexReasoningEffort) => void;
   onSelectApprovalPolicy: (value: CodexApprovalPolicy) => void;
-  onRemoveAttachment: (filePath: string) => void;
   onMentionQueryChange: (value: { query: string; start: number; end: number } | null) => void;
   onMentionSelect: (itemPath?: string) => void;
   onMoveMentionSelection: (direction: 'up' | 'down') => void;
@@ -83,6 +82,16 @@ export function CodexComposer({
     adjustTextareaHeight();
   }, [draft]);
 
+  useLayoutEffect(() => {
+    if (!textareaRef.current || pendingCaretPosition === null) {
+      return;
+    }
+
+    textareaRef.current.focus();
+    textareaRef.current.setSelectionRange(pendingCaretPosition, pendingCaretPosition);
+    onPendingCaretApplied();
+  }, [onPendingCaretApplied, pendingCaretPosition]);
+
   const updateMentionState = (value: string, caretPosition: number | null | undefined) => {
     const safeCaret = typeof caretPosition === 'number' ? caretPosition : value.length;
     const beforeCaret = value.slice(0, safeCaret);
@@ -102,45 +111,18 @@ export function CodexComposer({
 
   const reasoningOptions =
     currentModel?.supportedReasoningEfforts.map((item) => item.reasoningEffort) ?? ['minimal', 'low', 'medium', 'high', 'xhigh'];
-  const showFloatingPanel = isMentionActive || attachedItems.length > 0;
 
   return (
     <div className="border-t border-[var(--shell-border)] bg-[var(--panel-bg)] px-4 py-3">
       <div className="relative">
-        {showFloatingPanel ? (
-          <div className="pointer-events-auto absolute inset-x-2 bottom-[calc(100%-1px)] z-10 overflow-hidden rounded-t-[18px] border border-[var(--shell-border-strong)] border-b-0 bg-white shadow-[var(--shell-shadow)] transition-all duration-150">
-            {isMentionActive ? (
-              <FilePicker
-                items={mentionItems}
-                highlightedIndex={highlightedMentionIndex}
-                onSelectItem={onMentionSelect}
-                onHighlightItem={onMentionHover}
-              />
-            ) : (
-              <div className="flex max-h-44 flex-col">
-                <div className="border-b border-[var(--shell-border)] bg-[#fbfcfd] px-3 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--shell-muted)]">
-                  Selected context
-                </div>
-                <div className="overflow-auto px-2 py-1.5 custom-scrollbar">
-                  {attachedItems.map((item) => (
-                    <div
-                      key={item.path}
-                      className="group mb-1 flex items-center gap-2 rounded-xl px-3 py-1.5 text-[13px] text-[var(--shell-text)] transition hover:bg-[#f5f5f5]"
-                    >
-                      <TreeAssetIcon fileName={item.name} isFolder={item.type === 'directory'} className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0 truncate text-[var(--shell-muted)]">{item.relativePath}</span>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveAttachment(item.path)}
-                        className="ml-auto shrink-0 text-[11px] text-[var(--shell-subtle)] opacity-0 transition hover:text-[var(--shell-text)] group-hover:opacity-100"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        {isMentionActive ? (
+          <div className="pointer-events-auto absolute inset-x-0 bottom-[calc(100%+12px)] z-20 transition-all duration-150">
+            <FilePicker
+              items={mentionItems}
+              highlightedIndex={highlightedMentionIndex}
+              onSelectItem={onMentionSelect}
+              onHighlightItem={onMentionHover}
+            />
           </div>
         ) : null}
 
@@ -192,6 +174,7 @@ export function CodexComposer({
                 onSubmit();
               }
             }}
+            spellCheck={false}
             placeholder="Type a prompt or @mention files"
             className="min-h-[86px] w-full resize-none bg-transparent px-1 py-1 text-[15px] leading-6 text-[var(--shell-text)] outline-none placeholder:text-[#a8a8a8]"
           />

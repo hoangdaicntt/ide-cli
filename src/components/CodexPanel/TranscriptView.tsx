@@ -1,6 +1,5 @@
 import { AlertCircle, Sparkles, UserRound } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { getDisplayNameFromPath } from '../../store/store';
 import { MarkdownContent, UserContent } from './MarkdownContent';
 import type { TranscriptEntry } from './types';
 
@@ -62,18 +61,6 @@ export function TranscriptView({
                 ) : (
                   <MarkdownContent text={entry.text} tone={entry.role === 'system' ? 'system' : 'default'} />
                 )}
-                {entry.role === 'user' && entry.attachments.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {entry.attachments.map((filePath) => (
-                      <span
-                        key={filePath}
-                        className="rounded-full border border-[#d9d9d9] bg-[#f7f7f7] px-2.5 py-1 text-[11px] text-[var(--shell-muted)]"
-                      >
-                        @{getDisplayNameFromPath(filePath)}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             </div>
           </section>

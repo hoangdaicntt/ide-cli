@@ -15,6 +15,7 @@ import type {
   CodexThread,
   CodexTurnStartInput,
 } from '../shared/codex';
+import { applyMentionMarkdown } from '../components/CodexPanel/MentionText';
 
 export type CodexChatMessage =
   | {
@@ -932,6 +933,7 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
       }
 
       const resolvedAttachments = resolveAttachedFiles(tree, projectState.attachedFilePaths, rootPath);
+      const formattedPrompt = applyMentionMarkdown(trimmedPrompt, projectState.attachedFilePaths);
       const fileInputs = await Promise.all(
         resolvedAttachments.map(async ({ filePath, relativeLabel }) => {
           const content = await window.electronAPI.readFile(filePath);
@@ -963,7 +965,7 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
         input: [
           {
             type: 'text',
-            text: trimmedPrompt || 'Use the attached files as context and continue.',
+            text: formattedPrompt || 'Use the attached files as context and continue.',
           },
           ...fileInputs,
         ],
@@ -972,7 +974,7 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
       const optimisticMessage: CodexChatMessage = {
         id: `user-${turn.id}`,
         kind: 'user',
-        text: trimmedPrompt,
+        text: formattedPrompt,
         attachments: projectState.attachedFilePaths,
         turnId: turn.id,
       };

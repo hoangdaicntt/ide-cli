@@ -34,12 +34,8 @@ export function FilePicker({
   }, [highlightedIndex]);
 
   return (
-    <div className="flex max-h-64 flex-col">
-      <div className="border-b border-[var(--shell-border)] bg-[#fbfcfd] px-3 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--shell-muted)]">
-        Project files and folders
-      </div>
-
-      <div className="overflow-auto px-2 py-1.5 custom-scrollbar">
+    <div className="flex max-h-64 flex-col overflow-hidden rounded-[20px] border border-[var(--shell-border-strong)] bg-white shadow-[var(--shell-shadow)]">
+      <div className="overflow-auto px-2 py-2 custom-scrollbar">
         {items.length === 0 ? (
           <div className="px-3 py-6 text-center text-[13px] text-[var(--shell-muted)]">No matching items.</div>
         ) : null}
@@ -57,15 +53,15 @@ export function FilePicker({
               onMouseEnter={() => onHighlightItem(index)}
               onClick={() => onSelectItem(item.path)}
               className={[
-                'mb-1 flex w-full items-center justify-between gap-2 rounded-xl px-3 py-1.5 text-left text-[13px]',
+                'mb-1 flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 text-left text-[12px]',
                 isHighlighted ? 'bg-[var(--shell-selected)] text-[var(--shell-text)]' : 'text-[var(--shell-text)] hover:bg-[#f6f6f6]',
               ].join(' ')}
             >
               <div className="flex min-w-0 items-center gap-2">
-                <TreeAssetIcon fileName={item.name} isFolder={item.type === 'directory'} className="h-4 w-4 shrink-0" />
+                <TreeAssetIcon fileName={item.name} isFolder={item.type === 'directory'} className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">{item.relativePath}</span>
               </div>
-              <span className="shrink-0 text-[11px] uppercase tracking-[0.12em] text-[var(--shell-subtle)]">
+              <span className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-[var(--shell-subtle)]">
                 {item.type === 'directory' ? 'folder' : 'enter'}
               </span>
             </button>
