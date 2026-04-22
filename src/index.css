@@ -20,6 +20,7 @@
   --shell-hover: #e8e8e8;
   --shell-selected: #e4e6f1;
   --shell-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --panel-header-height: 33px;
 }
 
 html,

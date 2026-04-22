@@ -54,7 +54,7 @@ export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--panel-muted-bg)] text-[var(--shell-text)]">
-      <div className="app-drag-region flex items-center justify-between px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--shell-muted)]">
+      <div className="app-drag-region flex h-[var(--panel-header-height)] items-center justify-between px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--shell-muted)]">
         <span>Workspace</span>
         <button
           type="button"

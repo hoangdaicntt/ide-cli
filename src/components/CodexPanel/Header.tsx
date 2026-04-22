@@ -10,7 +10,7 @@ export function CodexHeader({
   connectionError: string | null;
 }) {
   return (
-    <div className="app-drag-region flex h-9 items-center gap-2 border-b border-[var(--shell-border)] bg-[var(--panel-muted-bg)] px-4">
+    <div className="app-drag-region flex h-[var(--panel-header-height)] items-center gap-2 border-b border-[var(--shell-border)] bg-[var(--panel-muted-bg)] px-4">
       <Cpu className="h-4 w-4 text-[var(--shell-accent)]" strokeWidth={2} />
       <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--shell-text)]">Codex AI</div>
       <div className="app-no-drag flex items-center gap-1">

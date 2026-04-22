@@ -121,7 +121,7 @@ export function FileTree({ projectId, nodes, activeFilePath }: FileTreeProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--panel-muted-bg)]">
-      <div className="app-drag-region flex items-center justify-between px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--shell-muted)]">
+      <div className="app-drag-region flex h-[var(--panel-header-height)] items-center justify-between px-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--shell-muted)]">
         <span>Tập tin (Explorer)</span>
         <button
           type="button"
