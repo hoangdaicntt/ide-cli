@@ -14,15 +14,19 @@ export function formatAssistantFragment(message: CodexChatMessage): string {
     case 'agent':
       return message.text;
     case 'command':
+      {
+        const commandText = message.command.filter(Boolean).join(' ').trim() || '[command unavailable]';
+
       return [
         'Ran command:',
         '```sh',
-        message.command.join(' '),
+        commandText,
         '```',
         message.output ? ['Output:', '```text', message.output, '```'].join('\n') : '',
       ]
         .filter(Boolean)
         .join('\n\n');
+      }
     case 'fileChange':
       return [
         'Updated files:',

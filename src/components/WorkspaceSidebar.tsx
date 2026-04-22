@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Folder, MessageSquare, MoreHorizontal, Plus, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { EyeOff, LoaderCircle, MessageSquareText, MoreHorizontal, Plus, SquarePen, Trash2 } from 'lucide-react';
 import { useCodexStore } from '../store/codexStore';
 import { useWorkspaceStore } from '../store/store';
 
@@ -11,7 +11,7 @@ function getTaskLabel(task: { name?: string | null; title?: string | null; previ
   return task.title || task.name || task.preview || 'Untitled chat';
 }
 
-export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ projectId: _projectId }: WorkspaceSidebarProps) {
   const projectIds = useWorkspaceStore((state) => state.projectIds);
   const projects = useWorkspaceStore((state) => state.projects);
   const activeProjectId = useWorkspaceStore((state) => state.activeProjectId);
@@ -23,22 +23,14 @@ export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
   const selectThread = useCodexStore((state) => state.selectThread);
   const newChat = useCodexStore((state) => state.newChat);
   const loadProjectThreads = useCodexStore((state) => state.loadProjectThreads);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => new Set(projectIds));
-  const [menuThreadId, setMenuThreadId] = useState<string | null>(null);
+  const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
+  const [hiddenProjectIds, setHiddenProjectIds] = useState<string[]>([]);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const toggleProject = (id: string) => {
-    setExpandedProjects((previous) => {
-      const next = new Set(previous);
-
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-
-      return next;
-    });
-  };
+  const visibleProjectIds = useMemo(
+    () => projectIds.filter((id) => !hiddenProjectIds.includes(id)),
+    [hiddenProjectIds, projectIds],
+  );
 
   useEffect(() => {
     for (const id of projectIds) {
@@ -51,6 +43,39 @@ export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
       void loadProjectThreads({ projectId: id, rootPath: workspace.rootPath });
     }
   }, [loadProjectThreads, projectIds, projects]);
+
+  useEffect(() => {
+    setHiddenProjectIds((current) => current.filter((id) => projectIds.includes(id)));
+  }, [projectIds]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (menuRef.current && event.target instanceof Node && !menuRef.current.contains(event.target)) {
+        setMenuProjectId(null);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, []);
+
+  const handleHideProject = (id: string) => {
+    setHiddenProjectIds((current) => (current.includes(id) ? current : [...current, id]));
+    setMenuProjectId(null);
+
+    if (id !== activeProjectId) {
+      return;
+    }
+
+    const nextVisibleProjectId = projectIds.find((candidateId) => candidateId !== id && !hiddenProjectIds.includes(candidateId));
+
+    if (nextVisibleProjectId) {
+      setActiveProject(nextVisibleProjectId);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[var(--panel-muted-bg)] text-[var(--shell-text)]">
@@ -69,152 +94,129 @@ export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto custom-scrollbar">
-        <div className="space-y-1 px-1 pb-3">
-          {projectIds.map((id) => {
+        <div className="py-2">
+          {visibleProjectIds.map((id) => {
             const project = projects[id];
-            const isActiveProject = id === activeProjectId;
-            const isExpanded = expandedProjects.has(id);
             const activeThreadId = projectStates[id]?.threadId ?? null;
             const orderedThreads = projectStates[id]?.threadSummaries ?? [];
             const isLoadingHistory = projectStates[id]?.isLoadingHistory ?? false;
+            const isProjectRunning = Boolean(projectStates[id]?.activeTurnId || projectStates[id]?.isSending);
 
             if (!project) {
               return null;
             }
 
             return (
-              <div key={id} className="space-y-0.5">
+              <section key={id}>
                 <div
-                  className={[
-                    'group flex items-center gap-1 rounded-md px-2 py-1 text-[13px] transition',
-                    isActiveProject ? 'bg-[var(--shell-selected)] text-[var(--shell-text)]' : 'hover:bg-[var(--shell-hover)]',
-                  ].join(' ')}
+                  ref={menuProjectId === id ? menuRef : null}
+                  className="relative flex items-center gap-2 border-y border-[var(--shell-border)] bg-[#e7e7e7] px-3 py-1.5"
                 >
                   <button
                     type="button"
-                    onClick={() => toggleProject(id)}
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--shell-muted)]"
-                    aria-label={isExpanded ? 'Collapse workspace' : 'Expand workspace'}
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="h-3.5 w-3.5" strokeWidth={2} />
-                    ) : (
-                      <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
-                    )}
-                  </button>
-
-                  <Folder className="h-4 w-4 shrink-0 text-[#c9a468]" strokeWidth={1.9} />
-
-                  <button
-                    type="button"
                     onClick={() => setActiveProject(id)}
-                    className="min-w-0 flex-1 truncate text-left text-[13px]"
+                    className="min-w-0 flex-1 truncate text-left text-[13px] font-bold text-[var(--shell-text)]"
+                    title={project.name}
                   >
                     {project.name}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => {
-                      void closeProject(id);
-                    }}
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--shell-muted)] opacity-0 transition hover:bg-white hover:text-[var(--shell-text)] group-hover:opacity-100"
-                    aria-label={`Close ${project.name}`}
+                    onClick={() => setMenuProjectId((current) => (current === id ? null : id))}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--shell-muted)] transition hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]"
+                    aria-label={`Workspace actions for ${project.name}`}
                   >
-                    <X className="h-3 w-3" strokeWidth={2.2} />
+                    <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2} />
                   </button>
+
+                  {menuProjectId === id ? (
+                    <div className="absolute right-0 top-7 z-20 min-w-[148px] overflow-hidden rounded-lg border border-[var(--shell-border)] bg-white shadow-[var(--shell-shadow)]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveProject(id);
+                          newChat(id);
+                          setMenuProjectId(null);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-[var(--shell-text)] transition hover:bg-[var(--shell-hover)]"
+                      >
+                        <SquarePen className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                        <span>New chat</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuProjectId(null);
+                          void closeProject(id);
+                        }}
+                        className="flex w-full items-center gap-2 border-t border-[var(--shell-border)] px-3 py-2 text-left text-[12px] text-[#b42318] transition hover:bg-[#fff5f5]"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                        <span>Remove</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleHideProject(id)}
+                        className="flex w-full items-center gap-2 border-t border-[var(--shell-border)] px-3 py-2 text-left text-[12px] text-[var(--shell-text)] transition hover:bg-[var(--shell-hover)]"
+                      >
+                        <EyeOff className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                        <span>Hide</span>
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
-                {isExpanded ? (
-                  <div className="space-y-0.5 pl-5">
-                    {orderedThreads.map((thread) => {
-                      const isActiveThread = isActiveProject && thread.id === activeThreadId;
-                      const isProcessing =
-                        isActiveProject &&
-                        thread.id === activeThreadId &&
-                        Boolean(projectStates[id]?.activeTurnId || projectStates[id]?.isSending);
+                <div>
+                  {orderedThreads.map((thread) => {
+                    const isActiveThread = id === activeProjectId && thread.id === activeThreadId;
+                    const isProcessing = thread.id === activeThreadId && isProjectRunning;
 
-                      return (
-                        <div
-                          key={thread.id}
+                    return (
+                      <button
+                        key={thread.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveProject(id);
+                          void selectThread({ projectId: id, threadId: thread.id });
+                        }}
+                        className={[
+                          'flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] font-medium transition',
+                          isActiveThread
+                            ? 'bg-[var(--shell-selected)] text-[var(--shell-text)]'
+                            : 'text-[var(--shell-text)] hover:bg-[var(--shell-hover)]',
+                        ].join(' ')}
+                        title={getTaskLabel(thread)}
+                      >
+                        <MessageSquareText
                           className={[
-                            'group relative flex items-center gap-2 rounded-md px-2 py-1 text-[13px] transition',
-                            isActiveThread
-                              ? 'bg-[var(--shell-selected)] text-[var(--shell-text)]'
-                              : 'text-[var(--shell-text)] hover:bg-[var(--shell-hover)]',
+                            'h-3.5 w-3.5 shrink-0',
+                            isActiveThread ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-muted)]',
                           ].join(' ')}
-                          title={getTaskLabel(thread)}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveProject(id);
-                              void selectThread({ projectId: id, threadId: thread.id });
-                            }}
-                            className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                          >
-                            <MessageSquare
-                              className={[
-                                'h-3.5 w-3.5 shrink-0',
-                                isActiveThread ? 'text-[var(--shell-accent)]' : 'text-[var(--shell-muted)]',
-                              ].join(' ')}
-                              strokeWidth={2}
-                            />
-                            <span className="truncate">{getTaskLabel(thread)}</span>
-                            {isProcessing ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--shell-accent)]" /> : null}
-                          </button>
+                          strokeWidth={2}
+                        />
+                        <span className="min-w-0 flex-1 truncate">{getTaskLabel(thread)}</span>
+                        {isProcessing ? (
+                          <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--shell-accent)]" strokeWidth={2} />
+                        ) : null}
+                      </button>
+                    );
+                  })}
 
-                          <button
-                            type="button"
-                            onClick={() => setMenuThreadId((current) => (current === thread.id ? null : thread.id))}
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-[var(--shell-muted)] opacity-0 transition hover:bg-white hover:text-[var(--shell-text)] group-hover:opacity-100"
-                            aria-label="Task actions"
-                          >
-                            <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2} />
-                          </button>
-
-                          {menuThreadId === thread.id ? (
-                            <div className="absolute right-2 top-8 z-10 w-32 overflow-hidden rounded-lg border border-[var(--shell-border)] bg-white shadow-[var(--shell-shadow)]">
-                              <button
-                                type="button"
-                                disabled
-                                className="block w-full px-3 py-2 text-left text-[12px] text-[#9aa3af] disabled:cursor-not-allowed"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                type="button"
-                                disabled
-                                className="block w-full border-t border-[#f0f0f0] px-3 py-2 text-left text-[12px] text-[#9aa3af] disabled:cursor-not-allowed"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveProject(id);
-                        newChat(id);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[13px] text-[var(--shell-accent)] transition hover:bg-[var(--shell-hover)]"
-                    >
-                      <Plus className="h-3.5 w-3.5" strokeWidth={2.2} />
-                      <span>{isLoadingHistory ? 'Loading tasks...' : 'New task'}</span>
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+                  {isLoadingHistory && orderedThreads.length === 0 ? (
+                    <div className="flex items-center gap-2 px-3 py-1.5 text-[12px] text-[var(--shell-muted)]">
+                      <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin" strokeWidth={2} />
+                      <span>Loading tasks...</span>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
             );
           })}
 
-          {projectIds.length === 0 ? (
+          {visibleProjectIds.length === 0 ? (
             <div className="px-3 py-8 text-[13px] text-[var(--shell-muted)]">
-              {isOpeningProject ? 'Opening workspace...' : 'No workspace open.'}
+              {projectIds.length > 0 ? 'All workspaces are hidden.' : isOpeningProject ? 'Opening workspace...' : 'No workspace open.'}
             </div>
           ) : null}
         </div>

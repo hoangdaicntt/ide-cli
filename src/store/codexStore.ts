@@ -246,66 +246,51 @@ function getRelativeAttachmentLabel(rootPath: string, targetPath: string): strin
   return targetPath;
 }
 
-function findTreeNodeByPath(nodes: Array<DirectoryNode | FileNode>, targetPath: string): DirectoryNode | FileNode | null {
-  for (const node of nodes) {
-    if (node.path === targetPath) {
-      return node;
-    }
-
-    if (node.type === 'directory') {
-      const match = findTreeNodeByPath(node.children, targetPath);
-
-      if (match) {
-        return match;
-      }
-    }
-  }
-
-  return null;
-}
-
-function collectFilesFromNode(node: DirectoryNode | FileNode): FileNode[] {
-  if (node.type === 'file') {
-    return [node];
-  }
-
-  return node.children.flatMap((child) => collectFilesFromNode(child));
-}
-
-function resolveAttachedFiles(
-  tree: DirectoryNode[],
-  attachedPaths: string[],
-  rootPath: string,
-): Array<{ filePath: string; relativeLabel: string }> {
-  const resolved: Array<{ filePath: string; relativeLabel: string }> = [];
+function buildAttachedPathEntries(attachedPaths: string[], rootPath: string): Array<{ path: string; relativeLabel: string }> {
+  const resolved: Array<{ path: string; relativeLabel: string }> = [];
   const seen = new Set<string>();
 
-  const appendFile = (filePath: string) => {
-    if (seen.has(filePath)) {
-      return;
-    }
-
-    seen.add(filePath);
-    resolved.push({
-      filePath,
-      relativeLabel: getRelativeAttachmentLabel(rootPath, filePath),
-    });
-  };
-
   for (const attachedPath of attachedPaths) {
-    const match = findTreeNodeByPath(tree, attachedPath);
-
-    if (!match) {
-      appendFile(attachedPath);
+    if (seen.has(attachedPath)) {
       continue;
     }
 
-    for (const file of collectFilesFromNode(match)) {
-      appendFile(file.path);
-    }
+    seen.add(attachedPath);
+    resolved.push({
+      path: attachedPath,
+      relativeLabel: getRelativeAttachmentLabel(rootPath, attachedPath),
+    });
   }
 
   return resolved;
+}
+
+function buildAttachmentContextText(entries: Array<{ path: string; relativeLabel: string }>): string | null {
+  if (entries.length === 0) {
+    return null;
+  }
+
+  return [
+    'Attached paths:',
+    ...entries.map((entry) => `- ${entry.relativeLabel} | ${entry.path}`),
+    'Read the attached paths from the workspace as needed. Their contents are not inlined in this message.',
+  ].join('\n');
+}
+
+function normalizeCommandParts(value: unknown): string[] {
+  if (typeof value === 'string') {
+    const command = value.trim();
+    return command ? [command] : [];
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((part): part is string => typeof part === 'string')
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function sortThreadSummaries(threads: CodexThread[]): CodexThread[] {
@@ -338,6 +323,8 @@ function stringifyUserInputContent(content: unknown[]): { text: string; attachme
   const textParts: string[] = [];
   const attachments: string[] = [];
   const attachedFileBlockPattern = /Attached file:\s+([^\n]+)\n```[\s\S]*?```/g;
+  const attachedPathBlockPattern =
+    /Attached paths:\n((?:- [^\n]+\n)+)Read the attached paths from the workspace as needed\. Their contents are not inlined in this message\.?/g;
 
   for (const item of content) {
     if (!item || typeof item !== 'object') {
@@ -349,10 +336,10 @@ function stringifyUserInputContent(content: unknown[]): { text: string; attachme
 
     if (itemType === 'text' && typeof candidate.text === 'string') {
       let textValue = candidate.text;
-      const matches = Array.from(textValue.matchAll(attachedFileBlockPattern));
+      const fileMatches = Array.from(textValue.matchAll(attachedFileBlockPattern));
 
-      if (matches.length > 0) {
-        for (const match of matches) {
+      if (fileMatches.length > 0) {
+        for (const match of fileMatches) {
           const attachmentLabel = match[1]?.trim();
 
           if (attachmentLabel) {
@@ -361,6 +348,24 @@ function stringifyUserInputContent(content: unknown[]): { text: string; attachme
         }
 
         textValue = textValue.replace(attachedFileBlockPattern, '').trim();
+      }
+
+      const pathMatches = Array.from(textValue.matchAll(attachedPathBlockPattern));
+
+      if (pathMatches.length > 0) {
+        for (const match of pathMatches) {
+          const block = match[1] ?? '';
+
+          for (const line of block.split('\n')) {
+            const attachmentLabel = line.replace(/^- /, '').split('|')[0]?.trim();
+
+            if (attachmentLabel) {
+              attachments.push(attachmentLabel);
+            }
+          }
+        }
+
+        textValue = textValue.replace(attachedPathBlockPattern, '').trim();
       }
 
       if (textValue) {
@@ -438,7 +443,7 @@ function mapHistoryItemToMessages(item: CodexHistoryItem, turnId: string): Codex
           kind: 'command',
           itemId: commandItem.id,
           turnId,
-          command: [commandItem.command],
+          command: normalizeCommandParts(commandItem.command),
           cwd: commandItem.cwd ?? null,
           output: commandItem.aggregatedOutput ?? '',
           status: commandItem.status ?? 'completed',
@@ -932,18 +937,9 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
         resumedThreadIds.add(threadId);
       }
 
-      const resolvedAttachments = resolveAttachedFiles(tree, projectState.attachedFilePaths, rootPath);
+      const attachedPathEntries = buildAttachedPathEntries(projectState.attachedFilePaths, rootPath);
+      const attachmentContext = buildAttachmentContextText(attachedPathEntries);
       const formattedPrompt = applyMentionMarkdown(trimmedPrompt, projectState.attachedFilePaths);
-      const fileInputs = await Promise.all(
-        resolvedAttachments.map(async ({ filePath, relativeLabel }) => {
-          const content = await window.electronAPI.readFile(filePath);
-
-          return {
-            type: 'text' as const,
-            text: [`Attached file: ${relativeLabel}`, '```', content, '```'].join('\n'),
-          };
-        }),
-      );
 
       const turn = await window.electronAPI.codexStartTurn({
         threadId,
@@ -967,7 +963,14 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
             type: 'text',
             text: formattedPrompt || 'Use the attached files as context and continue.',
           },
-          ...fileInputs,
+          ...(attachmentContext
+            ? [
+                {
+                  type: 'text' as const,
+                  text: attachmentContext,
+                },
+              ]
+            : []),
         ],
       });
 
@@ -1235,7 +1238,7 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
               kind: 'command',
               itemId: String(item.id),
               turnId,
-              command: Array.isArray(item.command) ? (item.command as string[]) : [],
+              command: normalizeCommandParts(item.command),
               cwd: typeof item.cwd === 'string' ? item.cwd : null,
               output: typeof item.aggregatedOutput === 'string' ? item.aggregatedOutput : '',
               status:

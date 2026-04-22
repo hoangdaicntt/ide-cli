@@ -37,6 +37,8 @@ function toErrorMessage(error: unknown): string {
 }
 
 export class CodexAppServerManager {
+  private static readonly MAX_TURN_INPUT_TEXT_LENGTH = 1_048_576;
+
   private child: ChildProcessWithoutNullStreams | null = null;
   private buffer = '';
   private nextRequestId = 1;
@@ -314,6 +316,32 @@ export class CodexAppServerManager {
   }
 
   async startTurn(input: CodexTurnStartInput): Promise<CodexTurn> {
+    const estimatedInputLength = input.input.reduce((total, item) => {
+      if (item.type === 'text') {
+        return total + item.text.length;
+      }
+
+      if (item.type === 'image') {
+        return total + item.url.length;
+      }
+
+      if (item.type === 'localImage') {
+        return total + item.path.length;
+      }
+
+      if (item.type === 'skill' || item.type === 'mention') {
+        return total + item.path.length + item.name.length;
+      }
+
+      return total;
+    }, 0);
+
+    if (estimatedInputLength > CodexAppServerManager.MAX_TURN_INPUT_TEXT_LENGTH) {
+      throw new Error(
+        `Turn input exceeds the maximum length of ${CodexAppServerManager.MAX_TURN_INPUT_TEXT_LENGTH} characters. Reduce the prompt or attached context.`,
+      );
+    }
+
     const result = await this.request<{ turn: CodexTurn }>('turn/start', input as unknown as Record<string, unknown>);
     return result.turn;
   }
