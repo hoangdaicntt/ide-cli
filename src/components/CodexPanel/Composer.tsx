@@ -1,5 +1,6 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
-import { AlertCircle, ArrowUp, ChevronDown, Plus } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { AlertCircle, ArrowUp, Check, ChevronDown, Plus, Square } from 'lucide-react';
 import type { CodexApprovalPolicy, CodexModel, CodexReasoningEffort } from '../../shared/codex';
 import type { ContextPickerItem } from './FilePicker';
 import { FilePicker } from './FilePicker';
@@ -8,8 +9,118 @@ function formatOptionLabel(value: string): string {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }
 
+function formatModelLabel(value: string): string {
+  return value
+    .split('-')
+    .map((part) => {
+      if (!part) {
+        return part;
+      }
+
+      if (part.toLowerCase() === 'gpt') {
+        return 'GPT';
+      }
+
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    })
+    .join('-');
+}
+
 function trimLeadingMentionMarker(value: string): string {
   return value.replace(/^@+/, '');
+}
+
+function ComposerDropdown({
+  value,
+  items,
+  onSelect,
+  className = '',
+  labelClassName = '',
+  icon,
+  align = 'right',
+}: {
+  value: string;
+  items: Array<{ value: string; label: string }>;
+  onSelect: (value: string) => void;
+  className?: string;
+  labelClassName?: string;
+  icon?: ReactNode;
+  align?: 'left' | 'right';
+}) {
+  const [open, setOpen] = useState(false);
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const selectedItem = items.find((item) => item.value === value) ?? items[0];
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!hostRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={hostRef} className={['relative inline-flex shrink-0', className].join(' ')}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex h-8 items-center gap-1.5 rounded-md bg-transparent px-2 pr-6 text-[13px] font-medium outline-none transition hover:bg-[#f4f4f4] hover:text-[var(--shell-text)]"
+      >
+        {icon ? <span className="pointer-events-none shrink-0">{icon}</span> : null}
+        <span className={['whitespace-nowrap', labelClassName].join(' ')}>{selectedItem?.label ?? value}</span>
+        <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--shell-muted)]" strokeWidth={2} />
+      </button>
+
+      {open ? (
+        <div
+          className={[
+            'absolute bottom-[calc(100%+10px)] z-30 min-w-full overflow-hidden rounded-[14px] border border-[var(--shell-border-strong)] bg-white py-1 shadow-[var(--shell-shadow)]',
+            align === 'right' ? 'right-0' : 'left-0',
+          ].join(' ')}
+        >
+          {items.map((item) => {
+            const isSelected = item.value === value;
+
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => {
+                  onSelect(item.value);
+                  setOpen(false);
+                }}
+                className={[
+                  'flex w-full items-center justify-between gap-4 px-3 py-1.5 text-left text-[12px] font-medium transition',
+                  isSelected ? 'bg-[var(--shell-selected)] text-[var(--shell-text)]' : 'text-[var(--shell-muted)] hover:bg-[#f6f6f6] hover:text-[var(--shell-text)]',
+                ].join(' ')}
+              >
+                <span className="whitespace-nowrap">{item.label}</span>
+                <Check className={['h-3.5 w-3.5 shrink-0', isSelected ? 'opacity-100' : 'opacity-0'].join(' ')} strokeWidth={2.2} />
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function CodexComposer({
@@ -73,7 +184,7 @@ export function CodexComposer({
     }
 
     textareaRef.current.style.height = 'auto';
-    const nextHeight = Math.min(Math.max(textareaRef.current.scrollHeight, 86), 220);
+    const nextHeight = Math.min(Math.max(textareaRef.current.scrollHeight, 76), 220);
     textareaRef.current.style.height = `${nextHeight}px`;
     textareaRef.current.style.overflowY = textareaRef.current.scrollHeight > 220 ? 'auto' : 'hidden';
   };
@@ -111,6 +222,21 @@ export function CodexComposer({
 
   const reasoningOptions =
     currentModel?.supportedReasoningEfforts.map((item) => item.reasoningEffort) ?? ['minimal', 'low', 'medium', 'high', 'xhigh'];
+  const showStopButton = canInterrupt || isSending;
+  const approvalOptions: Array<{ value: CodexApprovalPolicy; label: string }> = [
+    { value: 'on-request', label: 'Full access' },
+    { value: 'untrusted', label: 'Restricted' },
+    { value: 'on-failure', label: 'On failure' },
+    { value: 'never', label: 'Never' },
+  ];
+  const modelOptions = models.map((model) => ({
+    value: model.model,
+    label: formatModelLabel(model.displayName),
+  }));
+  const reasoningDropdownOptions = reasoningOptions.map((effort) => ({
+    value: effort,
+    label: formatOptionLabel(effort),
+  }));
 
   return (
     <div className="border-t border-[var(--shell-border)] bg-[var(--panel-bg)] px-4 py-3">
@@ -126,7 +252,7 @@ export function CodexComposer({
           </div>
         ) : null}
 
-        <div className="relative rounded-[18px] border border-[var(--shell-border-strong)] bg-white px-3 py-3 shadow-[var(--shell-shadow)]">
+        <div className="relative rounded-[18px] border border-[var(--shell-border-strong)] bg-white p-[9px] shadow-[var(--shell-shadow)]">
           <textarea
             ref={textareaRef}
             value={draft}
@@ -176,84 +302,54 @@ export function CodexComposer({
             }}
             spellCheck={false}
             placeholder="Type a prompt or @mention files"
-            className="min-h-[86px] w-full resize-none bg-transparent px-1 py-1 text-[15px] leading-6 text-[var(--shell-text)] outline-none placeholder:text-[#a8a8a8]"
+            className="no-scrollbar min-h-[76px] w-full resize-none bg-transparent px-0 py-0 text-[13px] leading-5 text-[var(--shell-text)] outline-none placeholder:text-[#a8a8a8]"
           />
 
-          <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--shell-border)] px-1 pt-3">
-            <div className="flex items-center gap-2 text-[13px] text-[var(--shell-muted)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center text-[13px] text-[var(--shell-muted)]">
               <button
                 type="button"
                 aria-label="Add context"
-                className="flex h-7 w-7 items-center justify-center rounded-full transition hover:bg-[#f4f4f4] hover:text-[var(--shell-text)]"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition hover:bg-[#f4f4f4] hover:text-[var(--shell-text)]"
               >
                 <Plus className="h-4 w-4" strokeWidth={2.1} />
               </button>
-
-              <div className="relative pl-5">
-                <AlertCircle className="pointer-events-none absolute left-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#b48600]" strokeWidth={2} />
-                <select
-                  value={selectedApprovalPolicy}
-                  onChange={(event) => onSelectApprovalPolicy(event.target.value as CodexApprovalPolicy)}
-                  className="h-8 appearance-none bg-transparent pr-5 text-[13px] font-medium text-[#b48600] outline-none"
-                >
-                  <option value="on-request">Full access</option>
-                  <option value="untrusted">Restricted</option>
-                  <option value="on-failure">On failure</option>
-                  <option value="never">Never</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--shell-muted)]" strokeWidth={2} />
-              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <select
-                  value={selectedModel}
-                  onChange={(event) => onSelectModel(event.target.value)}
-                  className="h-8 appearance-none bg-transparent pr-5 text-[13px] font-medium text-[var(--shell-muted)] outline-none"
-                >
-                  {models.map((model) => (
-                    <option key={model.id} value={model.model}>
-                      {model.displayName}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--shell-muted)]" strokeWidth={2} />
-              </div>
+            <div className="flex items-center gap-2 text-[13px] text-[var(--shell-muted)]">
+              <ComposerDropdown
+                value={selectedApprovalPolicy}
+                items={approvalOptions}
+                onSelect={(value) => onSelectApprovalPolicy(value as CodexApprovalPolicy)}
+                labelClassName="text-[#b48600]"
+                icon={<AlertCircle className="h-3.5 w-3.5 text-[#b48600]" strokeWidth={2} />}
+              />
 
-              <div className="relative">
-                <select
-                  value={selectedReasoningEffort ?? currentModel?.defaultReasoningEffort ?? 'medium'}
-                  onChange={(event) => onSelectReasoningEffort(event.target.value as CodexReasoningEffort)}
-                  className="h-8 appearance-none bg-transparent pr-5 text-[13px] font-medium text-[var(--shell-muted)] outline-none"
-                >
-                  {reasoningOptions.map((effort) => (
-                    <option key={effort} value={effort}>
-                      {formatOptionLabel(effort)}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--shell-muted)]" strokeWidth={2} />
-              </div>
+              <ComposerDropdown
+                value={selectedModel}
+                items={modelOptions}
+                onSelect={onSelectModel}
+              />
 
-              {canInterrupt ? (
-                <button
-                  type="button"
-                  onClick={onInterrupt}
-                  className="h-8 rounded-full border border-[#f0caca] bg-[#fff4f4] px-3 text-[12px] font-medium text-[#9a4851] transition hover:bg-[#ffeded]"
-                >
-                  Stop
-                </button>
-              ) : null}
+              <ComposerDropdown
+                value={selectedReasoningEffort ?? currentModel?.defaultReasoningEffort ?? 'medium'}
+                items={reasoningDropdownOptions}
+                onSelect={(value) => onSelectReasoningEffort(value as CodexReasoningEffort)}
+              />
 
               <button
                 type="button"
-                onClick={onSubmit}
-                disabled={connectionStatus !== 'ready' || isSending}
-                aria-label={isSending ? 'Sending' : 'Send prompt'}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1a1a1a] text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-[#a5a5a5]"
+                onClick={showStopButton ? onInterrupt : onSubmit}
+                disabled={!showStopButton && connectionStatus !== 'ready'}
+                aria-label={showStopButton ? 'Stop response' : 'Send prompt'}
+                className={[
+                  'flex h-8 w-8 items-center justify-center rounded-full transition',
+                  showStopButton
+                    ? 'border border-[#f0caca] bg-[#fff4f4] text-[#9a4851] hover:bg-[#ffeded]'
+                    : 'bg-[#1a1a1a] text-white hover:bg-black disabled:cursor-not-allowed disabled:bg-[#a5a5a5]',
+                ].join(' ')}
               >
-                <ArrowUp className="h-4 w-4" strokeWidth={2.2} />
+                {showStopButton ? <Square className="h-3.5 w-3.5 fill-current" strokeWidth={2.2} /> : <ArrowUp className="h-4 w-4" strokeWidth={2.2} />}
               </button>
             </div>
           </div>

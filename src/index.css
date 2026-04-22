@@ -89,20 +89,30 @@ select {
 
 .panel-resize-handle {
   position: relative;
-  width: 5px;
+  width: 1px;
   cursor: col-resize;
   background: transparent;
+  z-index: 5;
 }
 
 .panel-resize-handle::before {
   position: absolute;
   top: 0;
-  left: 2px;
+  left: 0;
   width: 1px;
   height: 100%;
   background: var(--shell-border);
   content: '';
   transition: background-color 120ms ease;
+}
+
+.panel-resize-handle::after {
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 9px;
+  height: 100%;
+  content: '';
 }
 
 .panel-resize-handle:hover::before {
@@ -111,20 +121,30 @@ select {
 
 .panel-resize-handle-horizontal {
   position: relative;
-  height: 5px;
+  height: 1px;
   cursor: row-resize;
   background: transparent;
+  z-index: 5;
 }
 
 .panel-resize-handle-horizontal::before {
   position: absolute;
-  top: 2px;
+  top: 0;
   left: 0;
   width: 100%;
   height: 1px;
   background: var(--shell-border);
   content: '';
   transition: background-color 120ms ease;
+}
+
+.panel-resize-handle-horizontal::after {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  width: 100%;
+  height: 9px;
+  content: '';
 }
 
 .panel-resize-handle-horizontal:hover::before {

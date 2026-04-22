@@ -3,7 +3,6 @@ import type {
   DirectoryNode,
   FileNode,
   PersistedProjectSession,
-  TerminalExitPayload,
   TerminalMeta,
   WorkspaceSession,
 } from '../shared/ipc';
@@ -22,8 +21,8 @@ export type ProjectWorkspace = {
   tree: DirectoryNode[];
   openFiles: Record<string, EditorTab>;
   activeFilePath: string | null;
-  terminal: TerminalMeta | null;
-  terminalStatus: 'idle' | 'running' | 'exited';
+  terminals: TerminalMeta[];
+  activeTerminalId: string | null;
 };
 
 type WorkspaceStore = {
@@ -40,7 +39,9 @@ type WorkspaceStore = {
   openFile: (projectId: string, file: FileNode) => Promise<void>;
   updateFileContent: (projectId: string, filePath: string, content: string) => void;
   ensureTerminal: (projectId: string) => Promise<TerminalMeta | null>;
-  handleTerminalExit: (payload: TerminalExitPayload) => void;
+  createTerminal: (projectId: string) => Promise<TerminalMeta | null>;
+  setActiveTerminal: (projectId: string, terminalId: string) => void;
+  closeTerminal: (projectId: string, terminalId: string) => Promise<void>;
   hydrateWorkspace: () => Promise<void>;
 };
 
@@ -71,7 +72,6 @@ function createProjectWorkspace(input: {
   tree: DirectoryNode[];
   openFiles?: Record<string, EditorTab>;
   activeFilePath?: string | null;
-  terminalStatus?: ProjectWorkspace['terminalStatus'];
 }): ProjectWorkspace {
   return {
     id: input.id,
@@ -80,8 +80,8 @@ function createProjectWorkspace(input: {
     tree: input.tree,
     openFiles: input.openFiles ?? {},
     activeFilePath: input.activeFilePath ?? null,
-    terminal: null,
-    terminalStatus: input.terminalStatus ?? 'idle',
+    terminals: [],
+    activeTerminalId: null,
   };
 }
 
@@ -92,7 +92,8 @@ function buildPersistedProjectSession(project: ProjectWorkspace): PersistedProje
     rootPath: project.rootPath,
     activeFilePath: project.activeFilePath,
     openFilePaths: Object.keys(project.openFiles),
-    hasOpenTerminal: Boolean(project.terminal) || project.terminalStatus === 'running',
+    hasOpenTerminal: project.terminals.length > 0,
+    openTerminalCount: project.terminals.length,
   };
 }
 
@@ -152,7 +153,6 @@ async function restoreProjectSession(projectSession: PersistedProjectSession): P
     tree,
     openFiles: openFilesEntries,
     activeFilePath,
-    terminalStatus: projectSession.hasOpenTerminal ? 'idle' : 'idle',
   });
 }
 
@@ -260,8 +260,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
     terminalRequests.delete(projectId);
 
-    if (project?.terminal?.terminalId) {
-      await window.electronAPI.killTerminal(project.terminal.terminalId);
+    if (project?.terminals.length) {
+      await Promise.all(
+        project.terminals.map(async (terminal) => {
+          await window.electronAPI.killTerminal(terminal.terminalId);
+        }),
+      );
     }
 
     set((state) => {
@@ -353,8 +357,38 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       return null;
     }
 
-    if (project.terminal) {
-      return project.terminal;
+    const activeTerminal = project.activeTerminalId
+      ? project.terminals.find((terminal) => terminal.terminalId === project.activeTerminalId) ?? null
+      : null;
+
+    if (activeTerminal) {
+      return activeTerminal;
+    }
+
+    if (project.terminals[0]) {
+      const fallbackTerminal = project.terminals[0];
+
+      set((state) => ({
+        projects: {
+          ...state.projects,
+          [projectId]: {
+            ...state.projects[projectId],
+            activeTerminalId: fallbackTerminal.terminalId,
+          },
+        },
+      }));
+
+      return fallbackTerminal;
+    }
+
+    return get().createTerminal(projectId);
+  },
+
+  createTerminal: async (projectId: string) => {
+    const project = get().projects[projectId];
+
+    if (!project) {
+      return null;
     }
 
     const pendingRequest = terminalRequests.get(projectId);
@@ -363,32 +397,30 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       return pendingRequest;
     }
 
-    set((state) => ({
-      projects: {
-        ...state.projects,
-        [projectId]: {
-          ...state.projects[projectId],
-          terminalStatus: 'running',
-        },
-      },
-    }));
-
     const request = window.electronAPI
       .createTerminal({
         projectId,
         cwd: project.rootPath,
       })
       .then((terminal) => {
-        set((state) => ({
-          projects: {
-            ...state.projects,
-            [projectId]: {
-              ...state.projects[projectId],
-              terminal,
-              terminalStatus: 'running',
+        set((state) => {
+          const currentProject = state.projects[projectId];
+
+          if (!currentProject) {
+            return state;
+          }
+
+          return {
+            projects: {
+              ...state.projects,
+              [projectId]: {
+                ...currentProject,
+                terminals: [...currentProject.terminals, terminal],
+                activeTerminalId: terminal.terminalId,
+              },
             },
-          },
-        }));
+          };
+        });
 
         return terminal;
       })
@@ -401,24 +433,62 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     return request;
   },
 
-  handleTerminalExit: (payload: TerminalExitPayload) => {
-    terminalRequests.delete(payload.projectId);
-
+  setActiveTerminal: (projectId: string, terminalId: string) => {
     set((state) => {
-      const project = state.projects[payload.projectId];
+      const project = state.projects[projectId];
 
-      if (!project) {
+      if (!project || !project.terminals.some((terminal) => terminal.terminalId === terminalId)) {
         return state;
       }
 
       return {
         projects: {
           ...state.projects,
-          [payload.projectId]: {
+          [projectId]: {
             ...project,
-            terminalStatus: 'exited',
-            terminal:
-              project.terminal?.terminalId === payload.terminalId ? null : project.terminal,
+            activeTerminalId: terminalId,
+          },
+        },
+      };
+    });
+  },
+
+  closeTerminal: async (projectId: string, terminalId: string) => {
+    const project = get().projects[projectId];
+
+    if (!project) {
+      return;
+    }
+
+    terminalRequests.delete(projectId);
+    await window.electronAPI.killTerminal(terminalId);
+
+    set((state) => {
+      const currentProject = state.projects[projectId];
+
+      if (!currentProject) {
+        return state;
+      }
+
+      const nextTerminals = currentProject.terminals.filter((terminal) => terminal.terminalId !== terminalId);
+
+      if (nextTerminals.length === currentProject.terminals.length) {
+        return state;
+      }
+
+      const currentIndex = currentProject.terminals.findIndex((terminal) => terminal.terminalId === terminalId);
+      const nextActiveTerminal =
+        currentProject.activeTerminalId === terminalId
+          ? nextTerminals[currentIndex] ?? nextTerminals[currentIndex - 1] ?? nextTerminals[0] ?? null
+          : nextTerminals.find((terminal) => terminal.terminalId === currentProject.activeTerminalId) ?? null;
+
+      return {
+        projects: {
+          ...state.projects,
+          [projectId]: {
+            ...currentProject,
+            terminals: nextTerminals,
+            activeTerminalId: nextActiveTerminal?.terminalId ?? null,
           },
         },
       };
@@ -469,7 +539,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         session.projects
           .filter((projectSession) => projectSession.hasOpenTerminal && projects[projectSession.id])
           .map(async (projectSession) => {
-            await get().ensureTerminal(projectSession.id);
+            const terminalCount = Math.max(projectSession.openTerminalCount ?? 1, 1);
+
+            for (let index = 0; index < terminalCount; index += 1) {
+              await get().createTerminal(projectSession.id);
+            }
           }),
       );
 

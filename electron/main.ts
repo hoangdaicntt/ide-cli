@@ -157,7 +157,11 @@ function isPersistedProjectSession(value: unknown): value is PersistedProjectSes
     (typeof candidate.activeFilePath === 'string' || candidate.activeFilePath === null) &&
     Array.isArray(candidate.openFilePaths) &&
     candidate.openFilePaths.every((entry) => typeof entry === 'string') &&
-    typeof candidate.hasOpenTerminal === 'boolean'
+    typeof candidate.hasOpenTerminal === 'boolean' &&
+    (candidate.openTerminalCount === undefined ||
+      (typeof candidate.openTerminalCount === 'number' &&
+        Number.isInteger(candidate.openTerminalCount) &&
+        candidate.openTerminalCount >= 0))
   );
 }
 

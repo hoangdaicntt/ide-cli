@@ -91,10 +91,10 @@ export function Editor({ projectId }: EditorProps) {
                 type="button"
                 onClick={() => setActiveFile(projectId, tab.path)}
                 className={[
-                  'group flex h-9 min-w-0 max-w-[220px] items-center gap-2 border-r border-[var(--shell-border)] px-3 text-left text-[13px] transition',
+                  'group flex h-8 min-w-0 max-w-[220px] items-center gap-2 border-b-2 border-r border-[var(--shell-border)] px-3 text-left text-[13px] transition',
                   isActive
-                    ? 'border-t-2 border-t-[var(--shell-accent)] bg-white text-black'
-                    : 'border-t-2 border-t-transparent text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]',
+                    ? 'border-b-[var(--shell-accent)] bg-white text-black'
+                    : 'border-b-transparent text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]',
                 ].join(' ')}
               >
                 <TreeAssetIcon fileName={tab.name} className="h-4 w-4 shrink-0" />

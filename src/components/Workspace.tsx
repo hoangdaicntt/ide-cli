@@ -14,7 +14,7 @@ type WorkspaceProps = {
 type ResizeTarget = 'sidebar' | 'codex' | 'files' | 'editor-terminal' | null;
 
 const ACTIVITY_BAR_WIDTH = 40;
-const SPLITTER_SIZE = 5;
+const SPLITTER_SIZE = 1;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);

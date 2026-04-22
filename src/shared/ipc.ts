@@ -73,6 +73,7 @@ export type PersistedProjectSession = {
   activeFilePath: string | null;
   openFilePaths: string[];
   hasOpenTerminal: boolean;
+  openTerminalCount?: number;
 };
 
 export type WorkspaceSession = {

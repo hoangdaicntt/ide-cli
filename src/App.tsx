@@ -33,7 +33,6 @@ export default function App() {
   const projectIds = useWorkspaceStore((state) => state.projectIds);
   const projects = useWorkspaceStore((state) => state.projects);
   const activeProjectId = useWorkspaceStore((state) => state.activeProjectId);
-  const handleTerminalExit = useWorkspaceStore((state) => state.handleTerminalExit);
   const hasHydratedWorkspace = useWorkspaceStore((state) => state.hasHydratedWorkspace);
   const hydrateWorkspace = useWorkspaceStore((state) => state.hydrateWorkspace);
   const initializeCodex = useCodexStore((state) => state.initialize);
@@ -47,16 +46,6 @@ export default function App() {
     void hydrateWorkspace();
     void initializeCodex();
   }, [hydrateWorkspace, initializeCodex]);
-
-  useEffect(() => {
-    const dispose = window.electronAPI.onTerminalExit((payload) => {
-      handleTerminalExit(payload);
-    });
-
-    return () => {
-      dispose();
-    };
-  }, [handleTerminalExit]);
 
   if (!hasHydratedWorkspace) {
     return (
