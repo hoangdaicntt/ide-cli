@@ -71,6 +71,7 @@ export function TranscriptView({
   projectId,
   isLoadingHistory,
   previousMessageCount,
+  activeTurnId,
   ApprovalCard,
 }: {
   transcript: TranscriptEntry[];
@@ -78,6 +79,7 @@ export function TranscriptView({
   projectId: string;
   isLoadingHistory: boolean;
   previousMessageCount: number;
+  activeTurnId: string | null;
   ApprovalCard: ComponentType<{ projectId: string; request: any }>;
 }) {
   return (
@@ -98,6 +100,7 @@ export function TranscriptView({
         </div>
       ) : null}
       {transcript.map((entry, index) => {
+        const isThinking = entry.role === 'assistant' && entry.turnId != null && entry.turnId === activeTurnId;
         const timestampLabel = entry.role === 'user' ? null : formatMessageTimestamp(entry.createdAt);
         const containerClass =
           entry.role === 'user'
@@ -123,10 +126,21 @@ export function TranscriptView({
                     <div className="min-w-0">
                       <MarkdownContent text={entry.text} tone={entry.role === 'system' ? 'system' : 'default'} />
                     </div>
-                    <div className="mt-3 flex items-center gap-3 text-[12px] text-[var(--shell-subtle)]">
-                      <MessageCopyButton text={entry.text} variant="footer" />
-                      <div>{timestampLabel ?? ''}</div>
-                    </div>
+                    {isThinking ? (
+                      <div className="mt-3 inline-flex items-center gap-2 text-[12px] text-[var(--shell-subtle)]">
+                        <span>Thinking</span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="h-1 w-1 animate-pulse rounded-full bg-current [animation-delay:0ms]" />
+                          <span className="h-1 w-1 animate-pulse rounded-full bg-current [animation-delay:150ms]" />
+                          <span className="h-1 w-1 animate-pulse rounded-full bg-current [animation-delay:300ms]" />
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex items-center gap-3 text-[12px] text-[var(--shell-subtle)]">
+                        <MessageCopyButton text={entry.text} variant="footer" />
+                        <div>{timestampLabel ?? ''}</div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

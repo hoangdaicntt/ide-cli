@@ -11,6 +11,46 @@ function getTaskLabel(task: { name?: string | null; title?: string | null; previ
   return task.title || task.name || task.preview || 'Untitled chat';
 }
 
+function formatTaskTimestamp(timestamp?: number): string {
+  if (!timestamp) {
+    return '';
+  }
+
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const isSameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (diffMinutes < 60) {
+    if (diffMinutes <= 1) {
+      return 'just now';
+    }
+
+    return `${diffMinutes}m ago`;
+  }
+
+  const timeLabel = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+
+  if (isSameDay) {
+    return timeLabel;
+  }
+
+  const dateLabel = new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(date);
+
+  return `${timeLabel} ${dateLabel}`;
+}
+
 export function WorkspaceSidebar({ projectId: _projectId }: WorkspaceSidebarProps) {
   const projectIds = useWorkspaceStore((state) => state.projectIds);
   const projects = useWorkspaceStore((state) => state.projects);
@@ -98,9 +138,9 @@ export function WorkspaceSidebar({ projectId: _projectId }: WorkspaceSidebarProp
           {visibleProjectIds.map((id) => {
             const project = projects[id];
             const activeThreadId = projectStates[id]?.threadId ?? null;
+            const runningThreadId = projectStates[id]?.runningThreadId ?? null;
             const orderedThreads = projectStates[id]?.threadSummaries ?? [];
             const isLoadingHistory = projectStates[id]?.isLoadingHistory ?? false;
-            const isProjectRunning = Boolean(projectStates[id]?.activeTurnId || projectStates[id]?.isSending);
 
             if (!project) {
               return null;
@@ -170,7 +210,8 @@ export function WorkspaceSidebar({ projectId: _projectId }: WorkspaceSidebarProp
                 <div>
                   {orderedThreads.map((thread) => {
                     const isActiveThread = id === activeProjectId && thread.id === activeThreadId;
-                    const isProcessing = thread.id === activeThreadId && isProjectRunning;
+                    const isProcessing = thread.id === runningThreadId;
+                    const timestampLabel = formatTaskTimestamp(thread.updatedAt ?? thread.createdAt);
 
                     return (
                       <button
@@ -196,6 +237,11 @@ export function WorkspaceSidebar({ projectId: _projectId }: WorkspaceSidebarProp
                           strokeWidth={2}
                         />
                         <span className="min-w-0 flex-1 truncate">{getTaskLabel(thread)}</span>
+                        {timestampLabel ? (
+                          <span className="shrink-0 text-[11px] font-normal text-[var(--shell-subtle)]">
+                            {timestampLabel}
+                          </span>
+                        ) : null}
                         {isProcessing ? (
                           <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--shell-accent)]" strokeWidth={2} />
                         ) : null}

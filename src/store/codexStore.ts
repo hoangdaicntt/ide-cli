@@ -88,6 +88,7 @@ export type PendingCodexRequest = {
 
 type ProjectCodexState = {
   threadId: string | null;
+  runningThreadId: string | null;
   threadSummaries: CodexThread[];
   draft: string;
   attachedFilePaths: string[];
@@ -153,6 +154,7 @@ type CodexStore = {
 
 const defaultProjectState = (): ProjectCodexState => ({
   threadId: null,
+  runningThreadId: null,
   threadSummaries: [],
   draft: '',
   attachedFilePaths: [],
@@ -233,7 +235,7 @@ function upsertMessage(messages: CodexChatMessage[], nextMessage: CodexChatMessa
       return message;
     }
 
-    return nextMessage;
+    return normalizedMessage;
   });
 }
 
@@ -568,6 +570,7 @@ function hydratePersistedProjectStates(): Record<string, ProjectCodexState> {
       {
         ...defaultProjectState(),
         ...projectState,
+        runningThreadId: null,
         pendingRequests: [],
         activeTurnId: null,
         isSending: false,
@@ -605,6 +608,7 @@ async function resumePersistedThreads(
           projectStates: withProjectState(state, projectId, (currentProjectState) => ({
             ...currentProjectState,
             threadId: null,
+            runningThreadId: null,
             messages: [
               ...currentProjectState.messages,
               {
@@ -889,10 +893,11 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
 
   newChat: (projectId) => {
     set((state) => ({
-      projectStates: withProjectState(state, projectId, (projectState) => ({
-        ...projectState,
-        threadId: null,
-        activeTurnId: null,
+        projectStates: withProjectState(state, projectId, (projectState) => ({
+          ...projectState,
+          threadId: null,
+          runningThreadId: null,
+          activeTurnId: null,
         isSending: false,
         isLoadingHistory: false,
         pendingRequests: [],
@@ -996,6 +1001,7 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
       set((state) => ({
         projectStates: withProjectState(state, projectId, (currentProjectState) => ({
           ...currentProjectState,
+          runningThreadId: threadId,
           activeTurnId: turn.id,
           draft: '',
           attachedFilePaths: [],
@@ -1139,6 +1145,8 @@ export const useCodexStore = create<CodexStore>((set, get) => ({
             ...state.projectStates,
             [projectId]: {
               ...projectState,
+              runningThreadId:
+                event.method === 'turn/completed' ? null : projectState.runningThreadId,
               activeTurnId:
                 event.method === 'turn/completed' ? null : projectState.activeTurnId,
               isSending: false,

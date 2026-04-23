@@ -28,6 +28,22 @@ type PendingRequest = {
   reject: (reason?: unknown) => void;
 };
 
+function normalizeEpochTimestamp(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+
+  return value < 1_000_000_000_000 ? value * 1000 : value;
+}
+
+function normalizeThread(thread: CodexThread): CodexThread {
+  return {
+    ...thread,
+    createdAt: normalizeEpochTimestamp(thread.createdAt),
+    updatedAt: normalizeEpochTimestamp(thread.updatedAt),
+  };
+}
+
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -142,6 +158,19 @@ export class CodexAppServerManager {
     }
 
     if (message.method) {
+      if (message.method === 'thread/started' && message.params?.thread) {
+        const params = message.params as { thread: CodexThread };
+
+        this.sendNotification({
+          method: message.method,
+          params: {
+            ...params,
+            thread: normalizeThread(params.thread),
+          },
+        } as CodexNotification);
+        return;
+      }
+
       this.sendNotification({
         method: message.method,
         params: message.params,
@@ -284,7 +313,7 @@ export class CodexAppServerManager {
       limit: input.limit ?? 50,
     });
 
-    return result.data ?? [];
+    return (result.data ?? []).map(normalizeThread);
   }
 
   async readThread(input: { threadId: string; includeTurns?: boolean }): Promise<CodexThread> {
@@ -293,7 +322,7 @@ export class CodexAppServerManager {
       includeTurns: Boolean(input.includeTurns),
     });
 
-    return result.thread;
+    return normalizeThread(result.thread);
   }
 
   async startThread(input: CodexThreadStartInput): Promise<CodexThread> {
@@ -304,7 +333,7 @@ export class CodexAppServerManager {
       sandbox: input.sandbox ?? 'workspace-write',
     });
 
-    return result.thread;
+    return normalizeThread(result.thread);
   }
 
   async resumeThread(threadId: string): Promise<CodexThread> {
@@ -312,7 +341,7 @@ export class CodexAppServerManager {
       threadId,
     });
 
-    return result.thread;
+    return normalizeThread(result.thread);
   }
 
   async startTurn(input: CodexTurnStartInput): Promise<CodexTurn> {

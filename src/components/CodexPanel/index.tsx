@@ -212,6 +212,7 @@ export function CodexPanel({ projectId, rootPath, tree }: CodexPanelProps) {
           projectId={projectId}
           isLoadingHistory={isLoadingHistory}
           previousMessageCount={previousMessageCount}
+          activeTurnId={projectState?.activeTurnId ?? null}
           ApprovalCard={ApprovalCard}
         />
       </div>

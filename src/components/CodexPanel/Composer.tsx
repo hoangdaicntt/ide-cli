@@ -5,6 +5,9 @@ import type { CodexApprovalPolicy, CodexModel, CodexReasoningEffort } from '../.
 import type { ContextPickerItem } from './FilePicker';
 import { FilePicker } from './FilePicker';
 
+const MIN_TEXTAREA_HEIGHT = 20;
+const MAX_TEXTAREA_HEIGHT = 220;
+
 function formatOptionLabel(value: string): string {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 }
@@ -173,24 +176,47 @@ export function CodexComposer({
   onMentionHover: (index: number) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const textareaHeightRef = useRef(MIN_TEXTAREA_HEIGHT);
+  const textareaOverflowRef = useRef<'auto' | 'hidden'>('hidden');
   const currentModel = useMemo(
     () => models.find((model) => model.model === selectedModel) ?? models[0] ?? null,
     [models, selectedModel],
   );
 
-  const adjustTextareaHeight = () => {
-    if (!textareaRef.current) {
+  const adjustTextareaHeight = (textarea: HTMLTextAreaElement | null) => {
+    if (!textarea) {
       return;
     }
 
-    textareaRef.current.style.height = 'auto';
-    const nextHeight = Math.min(Math.max(textareaRef.current.scrollHeight, 76), 220);
-    textareaRef.current.style.height = `${nextHeight}px`;
-    textareaRef.current.style.overflowY = textareaRef.current.scrollHeight > 220 ? 'auto' : 'hidden';
+    if (!textarea.value) {
+      textarea.style.height = `${MIN_TEXTAREA_HEIGHT}px`;
+      textarea.style.overflowY = 'hidden';
+      textareaHeightRef.current = MIN_TEXTAREA_HEIGHT;
+      textareaOverflowRef.current = 'hidden';
+      return;
+    }
+
+    textarea.style.height = '0px';
+
+    const scrollHeight = textarea.scrollHeight;
+    const nextHeight = Math.min(Math.max(scrollHeight, MIN_TEXTAREA_HEIGHT), MAX_TEXTAREA_HEIGHT);
+    const nextOverflow = scrollHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden';
+
+    if (textareaHeightRef.current !== nextHeight) {
+      textarea.style.height = `${nextHeight}px`;
+      textareaHeightRef.current = nextHeight;
+    } else {
+      textarea.style.height = `${textareaHeightRef.current}px`;
+    }
+
+    if (textareaOverflowRef.current !== nextOverflow) {
+      textarea.style.overflowY = nextOverflow;
+      textareaOverflowRef.current = nextOverflow;
+    }
   };
 
   useLayoutEffect(() => {
-    adjustTextareaHeight();
+    adjustTextareaHeight(textareaRef.current);
   }, [draft]);
 
   useLayoutEffect(() => {
@@ -255,8 +281,10 @@ export function CodexComposer({
         <div className="relative rounded-[18px] border border-[var(--shell-border-strong)] bg-white p-[9px] shadow-[var(--shell-shadow)]">
           <textarea
             ref={textareaRef}
+            rows={1}
             value={draft}
             onChange={(event) => {
+              adjustTextareaHeight(event.currentTarget);
               onDraftChange(event.target.value);
               updateMentionState(event.target.value, event.target.selectionStart);
             }}
@@ -302,7 +330,8 @@ export function CodexComposer({
             }}
             spellCheck={false}
             placeholder="Type a prompt or @mention files"
-            className="no-scrollbar min-h-[76px] w-full resize-none bg-transparent px-0 py-0 text-[13px] leading-5 text-[var(--shell-text)] outline-none placeholder:text-[#a8a8a8]"
+            style={{ height: `${MIN_TEXTAREA_HEIGHT}px`, overflowY: 'hidden' }}
+            className="no-scrollbar w-full resize-none bg-transparent px-0 py-0 text-[13px] leading-5 text-[var(--shell-text)] outline-none placeholder:text-[#a8a8a8]"
           />
 
           <div className="flex items-center justify-between gap-3">
